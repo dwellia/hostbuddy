@@ -2,7 +2,7 @@
  * api/hostbuddy-webhook.ts
  *
  * Receives POST requests from HostbuddyAI.
- * Returns HTTP 200 immediately, runs pipeline async.
+ * Runs pipeline first, then returns 200.
  */
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
@@ -46,20 +46,13 @@ export default async function handler(
     return;
   }
 
-  // Return 200 immediately so HostbuddyAI doesn't retry
-  res.status(200).json({ status: "queued" });
-
-  // Run pipeline async
-  processIssue(payload).catch((err: unknown) => {
+  // Run pipeline first, then respond
+  try {
+    await processIssue(payload);
+    res.status(200).json({ status: "ok" });
+  } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[Webhook] Pipeline error:", msg);
-
-    // Fallback: SMS Ryan if pipeline fails
-    import("../lib/quo").then(({ sendSMS }) => {
-      const phone = process.env.RYAN_PHONE;
-      if (phone) {
-        sendSMS(phone, `HostbuddyAI alert failed to process: ${payload.issue_type} at ${payload.property_id}. Check system.`).catch(() => {});
-      }
-    }).catch(() => {});
-  });
+    res.status(200).json({ status: "error", message: msg });
+  }
 }
