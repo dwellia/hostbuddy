@@ -1,0 +1,23 @@
+{
+  "name": "dwellia-hostbuddy-alert",
+  "version": "1.0.0",
+  "description": "HostbuddyAI → Claude → Quo SMS/call + Asana task routing for Dwellia",
+  "private": true,
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel deploy --prod",
+    "test:webhook": "node scripts/test-webhook.js",
+    "test:quo": "node scripts/test-quo.js",
+    "test:asana": "node scripts/test-asana.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.51.0"
+  },
+  "devDependencies": {
+    "@vercel/node": "^5.1.0",
+    "typescript": "^5.8.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
