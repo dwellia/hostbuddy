@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dwellia — Issue Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3352;
+      --text: #e8eaf6;
+      --muted: #7b82a8;
+      --accent: #6c8ef5;
+      --green: #4caf7d;
+      --orange: #f5a623;
+      --red: #e05c5c;
+      --dd: #6c8ef5;
+      --lg: #a78bfa;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    header h1 span.logo {
+      background: var(--accent);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .last-updated {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .filters {
+      padding: 16px 32px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+
+    .filters label { font-size: 12px; color: var(--muted); }
+
+    select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    select:focus { outline: 2px solid var(--accent); }
+
+    .main { padding: 24px 32px; display: flex; flex-direction: column; gap: 24px; }
+
+    /* Stat cards */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+
+    .stat-card .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .stat-card .value {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .stat-card .sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .stat-card.accent .value { color: var(--accent); }
+    .stat-card.green .value { color: var(--green); }
+    .stat-card.orange .value { color: var(--orange); }
+
+    /* Charts row */
+    .charts {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 900px) { .charts { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 600px) { .charts { grid-template-columns: 1fr; } }
+
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+
+    .chart-card h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 16px;
+    }
+
+    .chart-wrap { position: relative; height: 200px; }
+
+    /* Issues table */
+    .table-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .table-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .table-header h3 {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .table-header .count {
+      font-size: 12px;
+      color: var(--muted);
+      background: var(--surface2);
+      padding: 3px 8px;
+      border-radius: 20px;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+
+    thead th {
+      padding: 10px 16px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+
+    tbody td {
+      padding: 12px 16px;
+      font-size: 13px;
+      color: var(--text);
+      vertical-align: top;
+      max-width: 280px;
+    }
+
+    .truncate {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 240px;
+      display: block;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      white-space: nowrap;
+    }
+
+    .badge-dd { background: rgba(108,142,245,0.15); color: var(--dd); }
+    .badge-lg { background: rgba(167,139,250,0.15); color: var(--lg); }
+    .badge-yes { background: rgba(76,175,125,0.15); color: var(--green); }
+    .badge-no { background: rgba(123,130,168,0.1); color: var(--muted); }
+    .badge-cat { background: rgba(245,166,35,0.12); color: var(--orange); font-size: 10px; }
+
+    /* Detail modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      max-width: 640px;
+      width: 100%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .modal-head {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .modal-head h2 { font-size: 16px; font-weight: 600; line-height: 1.4; }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 20px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 2px;
+      flex-shrink: 0;
+    }
+
+    .modal-close:hover { color: var(--text); }
+
+    .modal-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+
+    .detail-row {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 8px;
+      align-items: baseline;
+    }
+
+    .detail-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .detail-value { font-size: 13px; color: var(--text); line-height: 1.5; }
+
+    .asana-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 13px;
+    }
+
+    .asana-link:hover { text-decoration: underline; }
+
+    .reasoning-box {
+      background: var(--surface2);
+      border-left: 3px solid var(--accent);
+      padding: 12px 14px;
+      border-radius: 0 6px 6px 0;
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.5;
+      font-style: italic;
+    }
+
+    /* Empty state */
+    .empty {
+      padding: 60px 20px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .empty .icon { font-size: 40px; margin-bottom: 12px; }
+    .empty p { font-size: 14px; }
+
+    /* Loading */
+    .loading {
+      padding: 60px 20px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>
+    <span class="logo">DWELLIA</span>
+    Issue Dashboard
+  </h1>
+  <span class="last-updated" id="lastUpdated">Loading...</span>
+</header>
+
+<div class="filters">
+  <label>Property</label>
+  <select id="filterProperty">
+    <option value="all">All Properties</option>
+    <option value="delta-dawn">Delta Dawn</option>
+    <option value="legobii">LeGobi Villa</option>
+  </select>
+
+  <label>Category</label>
+  <select id="filterCategory">
+    <option value="all">All Categories</option>
+    <option>CLEANLINESS</option>
+    <option>GUEST REQUESTS</option>
+    <option>MAINTENANCE</option>
+    <option>RESERVATION CHANGES</option>
+    <option>SUPPLY</option>
+    <option>OTHER</option>
+  </select>
+
+  <label>Visit Requested</label>
+  <select id="filterVisit">
+    <option value="all">All</option>
+    <option value="yes">Yes</option>
+    <option value="no">No</option>
+  </select>
+</div>
+
+<div class="main">
+  <div id="content"><div class="loading">Loading issues...</div></div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-head">
+      <h2 id="modalTitle"></h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+  let allIssues = [];
+  let charts = {};
+
+  const CATEGORY_COLORS = {
+    'CLEANLINESS':        '#6c8ef5',
+    'GUEST REQUESTS':     '#a78bfa',
+    'MAINTENANCE':        '#f5a623',
+    'RESERVATION CHANGES':'#4caf7d',
+    'SUPPLY':             '#e05c5c',
+    'OTHER':              '#7b82a8',
+  };
+
+  function categoryColor(cat) {
+    return CATEGORY_COLORS[cat] || '#7b82a8';
+  }
+
+  async function loadData() {
+    try {
+      const res = await fetch('/api/issues');
+      const data = await res.json();
+      allIssues = data.issues || [];
+      document.getElementById('lastUpdated').textContent =
+        'Updated ' + new Date().toLocaleTimeString();
+      render();
+    } catch (err) {
+      document.getElementById('content').innerHTML =
+        '<div class="loading">Failed to load data. Check Vercel KV setup.</div>';
+    }
+  }
+
+  function getFiltered() {
+    const prop = document.getElementById('filterProperty').value;
+    const cat = document.getElementById('filterCategory').value;
+    const visit = document.getElementById('filterVisit').value;
+
+    return allIssues.filter(issue => {
+      if (prop !== 'all' && issue.property_id !== prop) return false;
+      if (cat !== 'all' && issue.category !== cat) return false;
+      if (visit === 'yes' && !issue.guest_requested_visit) return false;
+      if (visit === 'no' && issue.guest_requested_visit) return false;
+      return true;
+    });
+  }
+
+  function buildMetrics(issues) {
+    const total = issues.length;
+    const visitReq = issues.filter(i => i.guest_requested_visit).length;
+    const smsSent = issues.filter(i => i.sms_sent).length;
+    const tasksCreated = issues.filter(i => i.task_created).length;
+
+    const byProperty = {};
+    const byCategory = {};
+    const byMonth = {};
+
+    for (const i of issues) {
+      byProperty[i.property] = (byProperty[i.property] || 0) + 1;
+      byCategory[i.category] = (byCategory[i.category] || 0) + 1;
+      const m = i.timestamp.slice(0, 7);
+      byMonth[m] = (byMonth[m] || 0) + 1;
+    }
+
+    return { total, visitReq, smsSent, tasksCreated, byProperty, byCategory, byMonth };
+  }
+
+  function render() {
+    const issues = getFiltered();
+    const m = buildMetrics(issues);
+
+    const html = `
+      <div class="stats">
+        <div class="stat-card accent">
+          <div class="label">Total Issues</div>
+          <div class="value">${m.total}</div>
+          <div class="sub">All flagged action items</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="label">Visit Requested</div>
+          <div class="value">${m.visitReq}</div>
+          <div class="sub">${m.total ? Math.round(m.visitReq/m.total*100) : 0}% of issues</div>
+        </div>
+        <div class="stat-card green">
+          <div class="label">SMS Sent</div>
+          <div class="value">${m.smsSent}</div>
+          <div class="sub">Team notified</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Tasks Created</div>
+          <div class="value">${m.tasksCreated}</div>
+          <div class="sub">In Asana</div>
+        </div>
+      </div>
+
+      <div class="charts">
+        <div class="chart-card">
+          <h3>By Category</h3>
+          <div class="chart-wrap"><canvas id="chartCategory"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>By Property</h3>
+          <div class="chart-wrap"><canvas id="chartProperty"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Issues Over Time</h3>
+          <div class="chart-wrap"><canvas id="chartTime"></canvas></div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-header">
+          <h3>Issue Log</h3>
+          <span class="count">${issues.length} issues</span>
+        </div>
+        ${issues.length === 0 ? `
+          <div class="empty">
+            <div class="icon">📋</div>
+            <p>No issues yet. They'll appear here once HostbuddyAI fires its first webhook.</p>
+          </div>
+        ` : `
+          <div style="overflow-x:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Property</th>
+                  <th>Guest</th>
+                  <th>Category</th>
+                  <th>Action Item</th>
+                  <th>Visit?</th>
+                  <th>SMS</th>
+                  <th>Task</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${issues.map((issue, i) => `
+                  <tr onclick="openModal(${i})">
+                    <td style="white-space:nowrap;color:var(--muted)">${formatDate(issue.timestamp)}</td>
+                    <td>
+                      <span class="badge ${issue.property_id === 'delta-dawn' ? 'badge-dd' : 'badge-lg'}">
+                        ${issue.property_id === 'delta-dawn' ? 'Delta Dawn' : 'LeGobi'}
+                      </span>
+                    </td>
+                    <td>${issue.guest_name || '—'}</td>
+                    <td><span class="badge badge-cat">${issue.category}</span></td>
+                    <td><span class="truncate">${issue.action_item}</span></td>
+                    <td>
+                      <span class="badge ${issue.guest_requested_visit ? 'badge-yes' : 'badge-no'}">
+                        ${issue.guest_requested_visit ? 'Yes' : 'No'}
+                      </span>
+                    </td>
+                    <td style="color:${issue.sms_sent ? 'var(--green)' : 'var(--muted)'}">
+                      ${issue.sms_sent ? '✓' : '—'}
+                    </td>
+                    <td style="color:${issue.task_created ? 'var(--green)' : 'var(--muted)'}">
+                      ${issue.task_created ? '✓' : '—'}
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `}
+      </div>
+    `;
+
+    document.getElementById('content').innerHTML = html;
+
+    // Destroy old charts
+    Object.values(charts).forEach(c => c.destroy());
+    charts = {};
+
+    if (issues.length === 0) return;
+
+    // Category donut
+    const catLabels = Object.keys(m.byCategory);
+    charts.category = new Chart(document.getElementById('chartCategory'), {
+      type: 'doughnut',
+      data: {
+        labels: catLabels,
+        datasets: [{
+          data: catLabels.map(l => m.byCategory[l]),
+          backgroundColor: catLabels.map(l => categoryColor(l)),
+          borderWidth: 0,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { color: '#7b82a8', font: { size: 11 }, boxWidth: 10, padding: 8 }
+          }
+        }
+      }
+    });
+
+    // Property bar
+    const propLabels = Object.keys(m.byProperty);
+    charts.property = new Chart(document.getElementById('chartProperty'), {
+      type: 'bar',
+      data: {
+        labels: propLabels,
+        datasets: [{
+          data: propLabels.map(l => m.byProperty[l]),
+          backgroundColor: propLabels.map(l =>
+            l.toLowerCase().includes('delta') ? 'rgba(108,142,245,0.7)' : 'rgba(167,139,250,0.7)'
+          ),
+          borderRadius: 6,
+          borderWidth: 0,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#7b82a8', font: { size: 11 } }, grid: { display: false } },
+          y: { ticks: { color: '#7b82a8', font: { size: 11 } }, grid: { color: '#2e3352' } }
+        }
+      }
+    });
+
+    // Time line
+    const months = Object.keys(m.byMonth).sort();
+    charts.time = new Chart(document.getElementById('chartTime'), {
+      type: 'line',
+      data: {
+        labels: months.map(m => {
+          const [y, mo] = m.split('-');
+          return new Date(y, mo - 1).toLocaleString('default', { month: 'short', year: '2-digit' });
+        }),
+        datasets: [{
+          data: months.map(mo => m.byMonth[mo]),
+          borderColor: '#6c8ef5',
+          backgroundColor: 'rgba(108,142,245,0.1)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 4,
+          pointBackgroundColor: '#6c8ef5',
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#7b82a8', font: { size: 11 } }, grid: { display: false } },
+          y: { ticks: { color: '#7b82a8', font: { size: 11 } }, grid: { color: '#2e3352' } }
+        }
+      }
+    });
+  }
+
+  function openModal(index) {
+    const issues = getFiltered();
+    const issue = issues[index];
+    if (!issue) return;
+
+    document.getElementById('modalTitle').textContent = issue.action_item;
+
+    document.getElementById('modalBody').innerHTML = `
+      <div class="reasoning-box">${issue.claude_reasoning}</div>
+
+      <div class="detail-row">
+        <span class="detail-label">Date</span>
+        <span class="detail-value">${new Date(issue.timestamp).toLocaleString()}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Property</span>
+        <span class="detail-value">
+          <span class="badge ${issue.property_id === 'delta-dawn' ? 'badge-dd' : 'badge-lg'}">
+            ${issue.property}
+          </span>
+        </span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Guest</span>
+        <span class="detail-value">${issue.guest_name || '—'}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Reservation ID</span>
+        <span class="detail-value" style="color:var(--muted);font-family:monospace">${issue.reservation_id}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Category</span>
+        <span class="detail-value"><span class="badge badge-cat">${issue.category}</span></span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Visit Requested</span>
+        <span class="detail-value">
+          <span class="badge ${issue.guest_requested_visit ? 'badge-yes' : 'badge-no'}">
+            ${issue.guest_requested_visit ? 'Yes' : 'No'}
+          </span>
+        </span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">SMS Sent</span>
+        <span class="detail-value" style="color:${issue.sms_sent ? 'var(--green)' : 'var(--muted)'}">
+          ${issue.sms_sent ? `✓ Sent to ${issue.notified_contact}` : 'Not sent'}
+        </span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Asana Task</span>
+        <span class="detail-value">
+          ${issue.asana_task_url
+            ? `<a class="asana-link" href="${issue.asana_task_url}" target="_blank">View task ↗</a>`
+            : issue.task_created ? '✓ Created' : '—'
+          }
+        </span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Conversation</span>
+        <span class="detail-value">${issue.conversation_length} messages pulled from Hospitable</span>
+      </div>
+    `;
+
+    document.getElementById('modalOverlay').classList.add('open');
+  }
+
+  function closeModal(e) {
+    if (!e || e.target === document.getElementById('modalOverlay') || e.target.classList.contains('modal-close')) {
+      document.getElementById('modalOverlay').classList.remove('open');
+    }
+  }
+
+  function formatDate(ts) {
+    const d = new Date(ts);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
+      ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+
+  // Filter listeners
+  ['filterProperty', 'filterCategory', 'filterVisit'].forEach(id => {
+    document.getElementById(id).addEventListener('change', render);
+  });
+
+  // Load on start, refresh every 60s
+  loadData();
+  setInterval(loadData, 60000);
+</script>
+</body>
+</html>
