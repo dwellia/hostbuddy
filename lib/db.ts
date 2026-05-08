@@ -2,10 +2,9 @@
  * lib/db.ts
  *
  * Stores issue records in Vercel Blob as a single JSON file.
- * Simple, free, no extra accounts needed.
  */
 
-import { put, head, getDownloadUrl } from "@vercel/blob";
+import { put, list } from "@vercel/blob";
 
 export type IssueCategory =
   | "CLEANLINESS"
@@ -40,17 +39,21 @@ const BLOB_FILENAME = "issues.json";
 /** Read all issues from Blob */
 async function readIssues(): Promise<IssueRecord[]> {
   try {
-    // Try to fetch existing blob
-    const url = `https://blob.vercel-storage.com/${BLOB_FILENAME}`;
-    const res = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`,
-      },
+    const { blobs } = await list({
+      prefix: BLOB_FILENAME,
+      token: process.env.BLOB_READ_WRITE_TOKEN,
     });
+
+    if (!blobs.length) return [];
+
+    // Use the public url directly
+    const res = await fetch(blobs[0].url);
     if (!res.ok) return [];
+
     const data = await res.json();
     return Array.isArray(data) ? data : [];
-  } catch {
+  } catch (err) {
+    console.error("[DB] Read error:", err);
     return [];
   }
 }
@@ -69,7 +72,7 @@ async function writeIssues(issues: IssueRecord[]): Promise<void> {
 export async function saveIssue(record: IssueRecord): Promise<void> {
   try {
     const issues = await readIssues();
-    issues.unshift(record); // newest first
+    issues.unshift(record);
     await writeIssues(issues);
     console.log(`[DB] Saved issue ${record.id}`);
   } catch (err) {
