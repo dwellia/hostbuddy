@@ -2,9 +2,11 @@
  * lib/db.ts
  *
  * Stores issue records in Vercel Blob as a single JSON file.
+ * Since allowOverwrite creates new files instead of replacing,
+ * we always read the newest file and delete old ones after writing.
  */
 
-import { put, list } from "@vercel/blob";
+import { put, list, del } from "@vercel/blob";
 
 export type IssueCategory =
   | "CLEANLINESS"
@@ -34,19 +36,25 @@ export interface IssueRecord {
   notified_contact: string | null;
 }
 
-const BLOB_FILENAME = "issues.json";
+const BLOB_PREFIX = "issues";
 
-/** Read all issues from Blob */
+/** Get all blob files for issues, sorted newest first */
+async function listBlobs() {
+  const { blobs } = await list({
+    prefix: BLOB_PREFIX,
+    token: process.env.BLOB_READ_WRITE_TOKEN,
+  });
+  return blobs.sort((a, b) =>
+    new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+  );
+}
+
+/** Read all issues from the newest blob file */
 async function readIssues(): Promise<IssueRecord[]> {
   try {
-    const { blobs } = await list({
-      prefix: BLOB_FILENAME,
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-    });
-
+    const blobs = await listBlobs();
     if (!blobs.length) return [];
 
-    // Use the public url directly
     const res = await fetch(blobs[0].url);
     if (!res.ok) return [];
 
@@ -58,14 +66,27 @@ async function readIssues(): Promise<IssueRecord[]> {
   }
 }
 
-/** Write all issues to Blob */
+/** Write issues and delete old blob files */
 async function writeIssues(issues: IssueRecord[]): Promise<void> {
-  await put(BLOB_FILENAME, JSON.stringify(issues), {
+  // Get existing blobs before writing
+  const oldBlobs = await listBlobs();
+
+  // Write new file
+  await put(`${BLOB_PREFIX}.json`, JSON.stringify(issues), {
     access: "public",
     contentType: "application/json",
     token: process.env.BLOB_READ_WRITE_TOKEN,
-    allowOverwrite: true,
+    addRandomSuffix: false,
   });
+
+  // Delete all old files
+  for (const blob of oldBlobs) {
+    try {
+      await del(blob.url, { token: process.env.BLOB_READ_WRITE_TOKEN });
+    } catch {
+      // ignore delete errors
+    }
+  }
 }
 
 /** Save a new issue record */
