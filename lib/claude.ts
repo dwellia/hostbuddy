@@ -1,13 +1,14 @@
 /**
  * lib/claude.ts
  *
- * Sends the HostbuddyAI issue to Claude and gets back a structured
- * routing decision.
+ * Sends the action item + full conversation to Claude.
+ * Claude decides: did the guest actually ask for someone to come out?
+ * If yes, routes to SMS + Asana. If no, does nothing.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
 import { buildTeamContext, PROPERTIES } from "./team";
-import type { Decision, HostbuddyPayload } from "./types";
+import type { Decision, HostbuddyActionItem, HospitableMessage } from "./types";
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -15,30 +16,32 @@ const client = new Anthropic({
 
 const SYSTEM_PROMPT = `You are an issue router for Dwellia, a premium family vacation rental company.
 
-Your job: analyze a maintenance or guest issue from HostbuddyAI and decide how to route it.
+HostbuddyAI has flagged an action item from a guest conversation. Your job is to read the full conversation and decide whether the guest has actually and explicitly asked for someone to physically come to the property.
 
-There are two contacts:
-- ryan: receives all alerts for Delta Dawn
-- amanda: receives all alerts for LeGobi
+IMPORTANT — only trigger if the guest clearly wants a visit:
+- "Can someone come fix this?" → YES
+- "Is there someone who can come look at this?" → YES
+- "The AC is broken" (no request for visit) → NO
+- "This is annoying" → NO
+- Early check-in requests → NO (no physical visit needed)
+- Questions that just need a text answer → NO
 
-Always route to whichever contact matches the property. Never route to the wrong property's contact.
+Two contacts:
+- ryan: handles Delta Dawn
+- amanda: handles LeGobi
 
-ROUTING RULES:
-- LOW severity → create Asana task only, no SMS
-- MEDIUM severity → SMS the contact + create Asana task
-- HIGH severity → SMS the contact + create urgent Asana task
-- CRITICAL severity → SMS the contact + send urgent follow-up (send_call=true) + create critical Asana task
-- Safety issues (gas, fire, injury, electrical hazard) → always SMS + urgent regardless of severity level
+Always route to the contact matching the property.
 
 SMS MESSAGE RULES:
 - Under 160 characters
-- Warm and direct — like texting a colleague, not a corporate alert
-- Include: what's wrong, property name, any relevant context
-- Good: "Hot tub stuck at 62° at Delta Dawn. Guest here tonight. Heating element maybe?"
-- Bad: "An aquatic heating malfunction has been detected requiring immediate investigation."
+- Warm and direct, like texting a colleague
+- Include: what the guest needs, property name
+- Good: "Guest at Delta Dawn asking for someone to check the AC. Says it's not cooling."
+- Bad: "A guest service request requires your immediate attention."
 
 Respond ONLY with valid JSON, no markdown:
 {
+  "guest_requesting_visit": boolean,
   "send_sms": boolean,
   "sms_to_key": "ryan or amanda or null",
   "sms_message": "message text",
@@ -53,22 +56,29 @@ Respond ONLY with valid JSON, no markdown:
 }`;
 
 export async function getRoutingDecision(
-  payload: HostbuddyPayload
+  actionItem: HostbuddyActionItem,
+  messages: HospitableMessage[]
 ): Promise<Decision> {
-  const property = PROPERTIES[payload.property_id];
   const teamContext = buildTeamContext();
+
+  // Format conversation for Claude
+  const conversation = messages.length
+    ? messages.map((m) => `[${m.author}]: ${m.body}`).join("\n")
+    : "No conversation messages available.";
 
   const userMessage = `${teamContext}
 
-ISSUE:
-  property_id: ${payload.property_id}
-  property_name: ${property?.name ?? "Unknown"}
-  issue_type: ${payload.issue_type}
-  severity: ${payload.severity}
-  guest_present: ${payload.guest_present}
-  ${payload.guest_name ? `guest_name: ${payload.guest_name}` : ""}
-  description: ${payload.description}
-  reported_at: ${payload.timestamp}`;
+ACTION ITEM FROM HOSTBUDDYAI:
+  property: ${actionItem.property_alias} (${actionItem.property_name})
+  guest: ${actionItem.guest_name}
+  category: ${actionItem.category}
+  item: ${actionItem.item}
+  created_at: ${actionItem.created_at_utc}
+
+FULL CONVERSATION FROM HOSPITABLE:
+${conversation}
+
+Based on the conversation above, did the guest explicitly ask for someone to physically come to the property? Route accordingly.`;
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-5",
@@ -89,7 +99,7 @@ ISSUE:
     throw new Error(`Claude returned invalid JSON: ${raw.slice(0, 200)}`);
   }
 
-  if (typeof decision.send_sms !== "boolean") {
+  if (typeof decision.guest_requesting_visit !== "boolean") {
     throw new Error("Claude decision missing required fields");
   }
 
