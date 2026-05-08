@@ -1,55 +1,35 @@
 /**
  * lib/team.ts
  *
- * Single source of truth for who's on the team and what they do.
- * When someone joins or leaves, update this file only.
+ * Ryan handles Delta Dawn. Amanda handles LeGobi.
+ * All texts come from the Dwellia Quo number.
  */
 
 export interface TeamMember {
   name: string;
-  role: "owner" | "tech";
-  phone: string; // E.164 format — must match env var value
-  asanaUserId: string; // Asana user GID
-  specialties: string[]; // used by Claude to match issue types
+  phone: string;
+  asanaUserId: string;
 }
 
 export interface Property {
   id: string;
   name: string;
   location: string;
-  ownerKey: string; // key into TEAM that is the primary owner
+  contactKey: string;       // key into TEAM who receives alerts for this property
   asanaProjectId: string;
 }
 
 // ── Team ──────────────────────────────────────────────────────────────────────
 export const TEAM: Record<string, TeamMember> = {
-  john: {
-    name: "John",
-    role: "owner",
-    phone: process.env.OWNER_JOHN_PHONE || "",
-    asanaUserId: process.env.ASANA_USER_JOHN || "",
-    specialties: ["guest_complaint", "safety_alert", "pool_equipment", "general"],
+  ryan: {
+    name: "Ryan",
+    phone: process.env.RYAN_PHONE || "",
+    asanaUserId: process.env.ASANA_USER_RYAN || "",
   },
-  sarah: {
-    name: "Sarah",
-    role: "owner",
-    phone: process.env.OWNER_SARAH_PHONE || "",
-    asanaUserId: process.env.ASANA_USER_SARAH || "",
-    specialties: ["guest_complaint", "safety_alert", "general"],
-  },
-  mike: {
-    name: "Mike",
-    role: "tech",
-    phone: process.env.TECH_MIKE_PHONE || "",
-    asanaUserId: process.env.ASANA_USER_MIKE || "",
-    specialties: ["hvac", "pool_equipment", "plumbing", "appliances"],
-  },
-  carlos: {
-    name: "Carlos",
-    role: "tech",
-    phone: process.env.TECH_CARLOS_PHONE || "",
-    asanaUserId: process.env.ASANA_USER_CARLOS || "",
-    specialties: ["electrical", "wifi", "entertainment_system", "appliances"],
+  amanda: {
+    name: "Amanda",
+    phone: process.env.AMANDA_PHONE || "",
+    asanaUserId: process.env.ASANA_USER_AMANDA || "",
   },
 };
 
@@ -59,41 +39,35 @@ export const PROPERTIES: Record<string, Property> = {
     id: "delta-dawn",
     name: "Delta Dawn Retreat",
     location: "Sevierville, TN",
-    ownerKey: "john",
+    contactKey: "ryan",
     asanaProjectId: process.env.ASANA_PROJECT_DELTA_DAWN || "",
   },
   legobii: {
     id: "legobii",
     name: "LeGobi Villa",
     location: "Kissimmee, FL",
-    ownerKey: "sarah",
+    contactKey: "amanda",
     asanaProjectId: process.env.ASANA_PROJECT_LEGOBII || "",
   },
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Get the owner for a property */
-export function getOwner(propertyId: string): TeamMember | null {
+export function getContact(propertyId: string): TeamMember | null {
   const property = PROPERTIES[propertyId];
   if (!property) return null;
-  return TEAM[property.ownerKey] || null;
+  return TEAM[property.contactKey] || null;
 }
 
-/** Format team context string for Claude's prompt */
 export function buildTeamContext(): string {
-  const lines: string[] = ["TEAM:"];
+  const lines: string[] = ["CONTACTS:"];
   for (const [key, member] of Object.entries(TEAM)) {
-    lines.push(
-      `  ${member.name} (${member.role}, key="${key}"): specialties=[${member.specialties.join(", ")}]`
-    );
+    lines.push(`  ${member.name} (key="${key}")`);
   }
   lines.push("\nPROPERTIES:");
   for (const [, prop] of Object.entries(PROPERTIES)) {
-    const owner = TEAM[prop.ownerKey];
-    lines.push(
-      `  ${prop.id}: "${prop.name}" in ${prop.location}, owner=${owner?.name}`
-    );
+    const contact = TEAM[prop.contactKey];
+    lines.push(`  ${prop.id}: "${prop.name}" in ${prop.location}, contact=${contact?.name}`);
   }
   return lines.join("\n");
 }
