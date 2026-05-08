@@ -11,7 +11,8 @@
     "test:asana": "node scripts/test-asana.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.51.0"
+    "@anthropic-ai/sdk": "^0.51.0",
+    "@vercel/kv": "^3.0.0"
   },
   "devDependencies": {
     "@vercel/node": "^5.1.0",
