@@ -1,9 +1,5 @@
 /**
  * lib/claude.ts
- *
- * Sends the action item + full conversation to Claude.
- * Claude decides: did the guest actually ask for someone to come out?
- * If yes, routes to SMS + Asana. If no, does nothing.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -26,6 +22,8 @@ IMPORTANT — only trigger if the guest clearly wants a visit:
 - Early check-in requests → NO (no physical visit needed)
 - Questions that just need a text answer → NO
 
+If the action item text contains "**TEST**" treat it as a visit request for testing purposes.
+
 Two contacts:
 - ryan: handles Delta Dawn
 - amanda: handles LeGobi
@@ -35,9 +33,12 @@ Always route to the contact matching the property.
 SMS MESSAGE RULES:
 - Under 160 characters
 - Warm and direct, like texting a colleague
+- If action item contains "**TEST**", start the SMS with "**TEST**"
 - Include: what the guest needs, property name
-- Good: "Guest at Delta Dawn asking for someone to check the AC. Says it's not cooling."
-- Bad: "A guest service request requires your immediate attention."
+- Good: "**TEST** Guest at Delta Dawn asking for someone to check the hot tub."
+
+TASK TITLE RULES:
+- If action item contains "**TEST**", start the task title with "**TEST**"
 
 Respond ONLY with valid JSON, no markdown:
 {
@@ -61,7 +62,6 @@ export async function getRoutingDecision(
 ): Promise<Decision> {
   const teamContext = buildTeamContext();
 
-  // Format conversation for Claude
   const conversation = messages.length
     ? messages.map((m) => `[${m.author}]: ${m.body}`).join("\n")
     : "No conversation messages available.";
