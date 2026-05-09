@@ -149,7 +149,7 @@ async function processActionItem(
     reservation_id: actionItem.reservation_id,
     category: actionItem.category,
     action_item: actionItem.item,
-    guest_requested_visit: decision.guest_requested_visit,
+    guest_requested_visit: decision.guest_requesting_visit,
     task_type: decision.task_type,
     sms_sent: smsSent,
     task_created: taskCreated,
