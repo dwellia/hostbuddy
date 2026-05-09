@@ -2,13 +2,11 @@
  * lib/types.ts
  */
 
-// ── HostbuddyAI webhook payload ───────────────────────────────────────────────
-
 export interface HostbuddyActionItem {
   id: string;
   status: string;
   category: string;
-  item: string;                // the action item description
+  item: string;
   guest_name: string;
   reservation_id: string;
   conversation_id: string;
@@ -25,19 +23,17 @@ export interface HostbuddyPayload {
   action_items: HostbuddyActionItem[];
 }
 
-// ── Hospitable message ────────────────────────────────────────────────────────
-
 export interface HospitableMessage {
   id: string;
   body: string;
   author: "host" | "guest" | string;
   created_at: string;
+  attachments: any[];
 }
 
-// ── Claude's routing decision ─────────────────────────────────────────────────
-
 export interface Decision {
-  guest_requesting_visit: boolean;  // did guest actually ask for someone to come out?
+  guest_requesting_visit: boolean;
+  issue_needs_attention: boolean; // true = next clean task, false = no action
   send_sms: boolean;
   sms_to_key: string | null;
   sms_message: string;
@@ -48,10 +44,9 @@ export interface Decision {
   task_description: string;
   task_priority: "low" | "medium" | "high";
   task_assignee_key: string | null;
+  task_type: "urgent" | "next_clean";
   reasoning: string;
 }
-
-// ── Results ───────────────────────────────────────────────────────────────────
 
 export interface QuoSendResult {
   success: boolean;

@@ -27,22 +27,38 @@ function loadData() {
     });
 }
 
+function deleteIssue(id, event) {
+  event.stopPropagation();
+  if (!confirm('Delete this issue?')) return;
+  fetch('/api/delete-issue?id=' + id, { method: 'DELETE' })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data.status === 'ok') {
+        allIssues = allIssues.filter(function(i) { return i.id !== id; });
+        render();
+      } else {
+        alert('Delete failed: ' + (data.error || 'unknown error'));
+      }
+    })
+    .catch(function(err) { alert('Delete failed: ' + err.message); });
+}
+
 function getFiltered() {
   var prop = document.getElementById('filterProperty').value;
   var cat = document.getElementById('filterCategory').value;
-  var visit = document.getElementById('filterVisit').value;
+  var type = document.getElementById('filterType').value;
   return allIssues.filter(function(issue) {
     if (prop !== 'all' && issue.property_id !== prop) return false;
     if (cat !== 'all' && issue.category !== cat) return false;
-    if (visit === 'yes' && !issue.guest_requested_visit) return false;
-    if (visit === 'no' && issue.guest_requested_visit) return false;
+    if (type !== 'all' && issue.task_type !== type) return false;
     return true;
   });
 }
 
 function buildMetrics(issues) {
   var total = issues.length;
-  var visitReq = issues.filter(function(i) { return i.guest_requested_visit; }).length;
+  var urgent = issues.filter(function(i) { return i.task_type === 'urgent'; }).length;
+  var nextClean = issues.filter(function(i) { return i.task_type === 'next_clean'; }).length;
   var smsSent = issues.filter(function(i) { return i.sms_sent; }).length;
   var tasksCreated = issues.filter(function(i) { return i.task_created; }).length;
   var byProperty = {}, byCategory = {}, byMonth = {};
@@ -52,12 +68,18 @@ function buildMetrics(issues) {
     var m = i.timestamp.slice(0, 7);
     byMonth[m] = (byMonth[m] || 0) + 1;
   });
-  return { total: total, visitReq: visitReq, smsSent: smsSent, tasksCreated: tasksCreated, byProperty: byProperty, byCategory: byCategory, byMonth: byMonth };
+  return { total: total, urgent: urgent, nextClean: nextClean, smsSent: smsSent, tasksCreated: tasksCreated, byProperty: byProperty, byCategory: byCategory, byMonth: byMonth };
 }
 
 function formatDate(ts) {
   var d = new Date(ts);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function taskTypeBadge(type) {
+  if (type === 'urgent') return '<span class="badge badge-urgent">Urgent</span>';
+  if (type === 'next_clean') return '<span class="badge badge-nextclean">Next Clean</span>';
+  return '<span class="badge badge-no">—</span>';
 }
 
 function render() {
@@ -68,33 +90,30 @@ function render() {
   issues.forEach(function(issue, i) {
     var propBadge = issue.property_id === 'delta-dawn' ? 'badge-dd' : 'badge-lg';
     var propLabel = issue.property_id === 'delta-dawn' ? 'Delta Dawn' : 'LeGobi';
-    var visitBadge = issue.guest_requested_visit ? 'badge-yes' : 'badge-no';
-    var visitLabel = issue.guest_requested_visit ? 'Yes' : 'No';
     var smsColor = issue.sms_sent ? 'color:#4caf7d' : 'color:#7b82a8';
     var taskColor = issue.task_created ? 'color:#4caf7d' : 'color:#7b82a8';
-    tableRows += '<tr data-index="' + i + '">' +
+    tableRows += '<tr data-index="' + i + '" data-id="' + issue.id + '">' +
       '<td style="white-space:nowrap;color:#7b82a8">' + formatDate(issue.timestamp) + '</td>' +
       '<td><span class="badge ' + propBadge + '">' + propLabel + '</span></td>' +
       '<td>' + (issue.guest_name || '—') + '</td>' +
       '<td><span class="badge badge-cat">' + issue.category + '</span></td>' +
       '<td><span class="truncate">' + issue.action_item + '</span></td>' +
-      '<td><span class="badge ' + visitBadge + '">' + visitLabel + '</span></td>' +
+      '<td>' + taskTypeBadge(issue.task_type) + '</td>' +
       '<td style="' + smsColor + '">' + (issue.sms_sent ? '✓' : '—') + '</td>' +
       '<td style="' + taskColor + '">' + (issue.task_created ? '✓' : '—') + '</td>' +
+      '<td><button class="delete-btn" data-id="' + issue.id + '">&#x2715;</button></td>' +
       '</tr>';
   });
 
   var tableContent = issues.length === 0
     ? '<div class="empty"><div class="icon">📋</div><p>No issues yet.</p></div>'
-    : '<div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Property</th><th>Guest</th><th>Category</th><th>Action Item</th><th>Visit?</th><th>SMS</th><th>Task</th></tr></thead><tbody>' + tableRows + '</tbody></table></div>';
-
-  var pct = m.total ? Math.round(m.visitReq / m.total * 100) : 0;
+    : '<div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Property</th><th>Guest</th><th>Category</th><th>Action Item</th><th>Type</th><th>SMS</th><th>Task</th><th></th></tr></thead><tbody>' + tableRows + '</tbody></table></div>';
 
   document.getElementById('content').innerHTML =
     '<div class="stats">' +
       '<div class="stat-card accent"><div class="label">Total Issues</div><div class="value">' + m.total + '</div><div class="sub">All flagged action items</div></div>' +
-      '<div class="stat-card orange"><div class="label">Visit Requested</div><div class="value">' + m.visitReq + '</div><div class="sub">' + pct + '% of issues</div></div>' +
-      '<div class="stat-card green"><div class="label">SMS Sent</div><div class="value">' + m.smsSent + '</div><div class="sub">Team notified</div></div>' +
+      '<div class="stat-card orange"><div class="label">Urgent</div><div class="value">' + m.urgent + '</div><div class="sub">Visit requested</div></div>' +
+      '<div class="stat-card green"><div class="label">Next Clean</div><div class="value">' + m.nextClean + '</div><div class="sub">Fix at turnover</div></div>' +
       '<div class="stat-card"><div class="label">Tasks Created</div><div class="value">' + m.tasksCreated + '</div><div class="sub">In Asana</div></div>' +
     '</div>' +
     '<div class="charts">' +
@@ -107,36 +126,35 @@ function render() {
       tableContent +
     '</div>';
 
-  // Destroy old charts
   Object.keys(charts).forEach(function(k) { charts[k].destroy(); });
   charts = {};
 
   if (!issues.length) return;
 
-  // Add row click listeners
   document.querySelectorAll('tbody tr').forEach(function(row) {
-    row.addEventListener('click', function() {
+    row.addEventListener('click', function(e) {
+      if (e.target.classList.contains('delete-btn')) return;
       openModal(parseInt(row.getAttribute('data-index')));
+    });
+  });
+
+  document.querySelectorAll('.delete-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      deleteIssue(btn.getAttribute('data-id'), e);
     });
   });
 
   var catLabels = Object.keys(m.byCategory);
   charts.category = new Chart(document.getElementById('chartCategory'), {
     type: 'doughnut',
-    data: {
-      labels: catLabels,
-      datasets: [{ data: catLabels.map(function(l) { return m.byCategory[l]; }), backgroundColor: catLabels.map(categoryColor), borderWidth: 0 }]
-    },
+    data: { labels: catLabels, datasets: [{ data: catLabels.map(function(l) { return m.byCategory[l]; }), backgroundColor: catLabels.map(categoryColor), borderWidth: 0 }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#7b82a8', font: { size: 11 }, boxWidth: 10, padding: 8 } } } }
   });
 
   var propLabels = Object.keys(m.byProperty);
   charts.property = new Chart(document.getElementById('chartProperty'), {
     type: 'bar',
-    data: {
-      labels: propLabels,
-      datasets: [{ data: propLabels.map(function(l) { return m.byProperty[l]; }), backgroundColor: propLabels.map(function(l) { return l.toLowerCase().includes('delta') ? 'rgba(108,142,245,0.7)' : 'rgba(167,139,250,0.7)'; }), borderRadius: 6, borderWidth: 0 }]
-    },
+    data: { labels: propLabels, datasets: [{ data: propLabels.map(function(l) { return m.byProperty[l]; }), backgroundColor: propLabels.map(function(l) { return l.toLowerCase().includes('delta') ? 'rgba(108,142,245,0.7)' : 'rgba(167,139,250,0.7)'; }), borderRadius: 6, borderWidth: 0 }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#7b82a8', font: { size: 11 } }, grid: { display: false } }, y: { ticks: { color: '#7b82a8', font: { size: 11 } }, grid: { color: '#2e3352' } } } }
   });
 
@@ -144,7 +162,7 @@ function render() {
   charts.time = new Chart(document.getElementById('chartTime'), {
     type: 'line',
     data: {
-      labels: months.map(function(mo) { var parts = mo.split('-'); return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1).toLocaleString('default', { month: 'short', year: '2-digit' }); }),
+      labels: months.map(function(mo) { var p = mo.split('-'); return new Date(parseInt(p[0]), parseInt(p[1]) - 1).toLocaleString('default', { month: 'short', year: '2-digit' }); }),
       datasets: [{ data: months.map(function(mo) { return m.byMonth[mo]; }), borderColor: '#6c8ef5', backgroundColor: 'rgba(108,142,245,0.1)', fill: true, tension: 0.3, pointRadius: 4, pointBackgroundColor: '#6c8ef5' }]
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#7b82a8', font: { size: 11 } }, grid: { display: false } }, y: { ticks: { color: '#7b82a8', font: { size: 11 } }, grid: { color: '#2e3352' } } } }
@@ -167,9 +185,9 @@ function openModal(index) {
     '<div class="detail-row"><span class="detail-label">Date</span><span class="detail-value">' + new Date(issue.timestamp).toLocaleString() + '</span></div>' +
     '<div class="detail-row"><span class="detail-label">Property</span><span class="detail-value"><span class="badge ' + (issue.property_id === 'delta-dawn' ? 'badge-dd' : 'badge-lg') + '">' + issue.property + '</span></span></div>' +
     '<div class="detail-row"><span class="detail-label">Guest</span><span class="detail-value">' + (issue.guest_name || '—') + '</span></div>' +
-    '<div class="detail-row"><span class="detail-label">Reservation ID</span><span class="detail-value" style="color:#7b82a8;font-family:monospace">' + issue.reservation_id + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Reservation</span><span class="detail-value" style="color:#7b82a8;font-family:monospace">' + issue.reservation_id + '</span></div>' +
     '<div class="detail-row"><span class="detail-label">Category</span><span class="detail-value"><span class="badge badge-cat">' + issue.category + '</span></span></div>' +
-    '<div class="detail-row"><span class="detail-label">Visit Requested</span><span class="detail-value"><span class="badge ' + (issue.guest_requested_visit ? 'badge-yes' : 'badge-no') + '">' + (issue.guest_requested_visit ? 'Yes' : 'No') + '</span></span></div>' +
+    '<div class="detail-row"><span class="detail-label">Type</span><span class="detail-value">' + taskTypeBadge(issue.task_type) + '</span></div>' +
     '<div class="detail-row"><span class="detail-label">SMS Sent</span><span class="detail-value" style="color:' + (issue.sms_sent ? '#4caf7d' : '#7b82a8') + '">' + (issue.sms_sent ? '&#x2713; Sent to ' + issue.notified_contact : 'Not sent') + '</span></div>' +
     '<div class="detail-row"><span class="detail-label">Asana Task</span><span class="detail-value">' + taskLink + '</span></div>' +
     '<div class="detail-row"><span class="detail-label">Conversation</span><span class="detail-value">' + issue.conversation_length + ' messages from Hospitable</span></div>';
@@ -184,13 +202,11 @@ function closeModal() {
 document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('filterProperty').addEventListener('change', render);
   document.getElementById('filterCategory').addEventListener('change', render);
-  document.getElementById('filterVisit').addEventListener('change', render);
-
+  document.getElementById('filterType').addEventListener('change', render);
   document.getElementById('modalClose').addEventListener('click', closeModal);
   document.getElementById('modalOverlay').addEventListener('click', function(e) {
     if (e.target === document.getElementById('modalOverlay')) closeModal();
   });
-
   loadData();
   setInterval(loadData, 60000);
 });

@@ -1,10 +1,5 @@
 /**
  * lib/asana.ts
- *
- * Creates tasks in Asana via the REST API.
- * Docs: https://developers.asana.com/docs/create-a-task
- *
- * Auth: Personal Access Token in Authorization: Bearer <token>
  */
 
 import type { AsanaCreateResult } from "./types";
@@ -33,16 +28,15 @@ export async function createTask(options: {
   priority: "low" | "medium" | "high";
   assigneeGid: string | null;
   projectGid: string;
+  dueDate: string; // YYYY-MM-DD
 }): Promise<AsanaCreateResult> {
   try {
     if (!options.projectGid) {
-      return { success: false, error: "No Asana project GID configured for this property" };
+      return { success: false, error: "No Asana project GID configured" };
     }
 
-    console.log(`[Asana] Creating task: "${options.title}"`);
+    console.log(`[Asana] Creating task: "${options.title}" due ${options.dueDate}`);
 
-    // Build the task body.
-    // Notes is plain text — Asana will display it nicely.
     const taskBody: Record<string, unknown> = {
       name: options.title,
       notes: [
@@ -52,6 +46,7 @@ export async function createTask(options: {
         `Source: HostbuddyAI → Dwellia Alert System`,
       ].join("\n"),
       projects: [options.projectGid],
+      due_on: options.dueDate,
     };
 
     if (options.assigneeGid) {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dwellia — Issue Dashboard</title>
+  <title>Dwellia — Action Item Dashboard</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -49,9 +49,12 @@
     .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; }
     .badge-dd { background: rgba(108,142,245,0.15); color: var(--dd); }
     .badge-lg { background: rgba(167,139,250,0.15); color: var(--lg); }
-    .badge-yes { background: rgba(76,175,125,0.15); color: var(--green); }
+    .badge-urgent { background: rgba(224,92,92,0.15); color: var(--red); }
+    .badge-nextclean { background: rgba(76,175,125,0.15); color: var(--green); }
     .badge-no { background: rgba(123,130,168,0.1); color: var(--muted); }
     .badge-cat { background: rgba(245,166,35,0.12); color: var(--orange); font-size: 10px; }
+    .delete-btn { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 4px; padding: 2px 7px; cursor: pointer; font-size: 12px; transition: all 0.1s; }
+    .delete-btn:hover { border-color: var(--red); color: var(--red); }
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; padding: 24px; }
     .modal-overlay.open { display: flex; }
     .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; max-width: 640px; width: 100%; max-height: 80vh; overflow-y: auto; }
@@ -74,7 +77,7 @@
 <body>
 
 <header>
-  <h1><span class="logo">DWELLIA</span> Issue Dashboard</h1>
+  <h1><span class="logo">DWELLIA</span> Action Item Dashboard</h1>
   <span class="last-updated" id="lastUpdated">Loading...</span>
 </header>
 
@@ -95,11 +98,12 @@
     <option>SUPPLY</option>
     <option>OTHER</option>
   </select>
-  <label>Visit Requested</label>
-  <select id="filterVisit">
-    <option value="all">All</option>
-    <option value="yes">Yes</option>
-    <option value="no">No</option>
+  <label>Type</label>
+  <select id="filterType">
+    <option value="all">All Types</option>
+    <option value="urgent">Urgent</option>
+    <option value="next_clean">Next Clean</option>
+    <option value="none">No Action</option>
   </select>
 </div>
 
