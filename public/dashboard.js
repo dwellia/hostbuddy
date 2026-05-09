@@ -73,7 +73,7 @@ function buildMetrics(issues) {
 
 function formatDate(ts) {
   var d = new Date(ts);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });
 }
 
 function taskTypeBadge(type) {
@@ -153,9 +153,9 @@ function render() {
 
   var propLabels = Object.keys(m.byProperty);
   charts.property = new Chart(document.getElementById('chartProperty'), {
-    type: 'bar',
-    data: { labels: propLabels, datasets: [{ data: propLabels.map(function(l) { return m.byProperty[l]; }), backgroundColor: propLabels.map(function(l) { return l.toLowerCase().includes('delta') ? 'rgba(108,142,245,0.7)' : 'rgba(167,139,250,0.7)'; }), borderRadius: 6, borderWidth: 0 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#7b82a8', font: { size: 11 } }, grid: { display: false } }, y: { ticks: { color: '#7b82a8', font: { size: 11 } }, grid: { color: '#2e3352' } } } }
+    type: 'doughnut',
+    data: { labels: propLabels, datasets: [{ data: propLabels.map(function(l) { return m.byProperty[l]; }), backgroundColor: propLabels.map(function(l) { return l.toLowerCase().includes('delta') ? 'rgba(108,142,245,0.7)' : 'rgba(167,139,250,0.7)'; }), borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#7b82a8', font: { size: 11 }, boxWidth: 10, padding: 8 } } } }
   });
 
   var months = Object.keys(m.byMonth).sort();
@@ -182,7 +182,7 @@ function openModal(index) {
 
   document.getElementById('modalBody').innerHTML =
     '<div class="reasoning-box">' + issue.claude_reasoning + '</div>' +
-    '<div class="detail-row"><span class="detail-label">Date</span><span class="detail-value">' + new Date(issue.timestamp).toLocaleString() + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Date</span><span class="detail-value">' + new Date(issue.timestamp).toLocaleString('en-US', { timeZone: 'America/New_York' }) + '</span></div>' +
     '<div class="detail-row"><span class="detail-label">Property</span><span class="detail-value"><span class="badge ' + (issue.property_id === 'delta-dawn' ? 'badge-dd' : 'badge-lg') + '">' + issue.property + '</span></span></div>' +
     '<div class="detail-row"><span class="detail-label">Guest</span><span class="detail-value">' + (issue.guest_name || '—') + '</span></div>' +
     '<div class="detail-row"><span class="detail-label">Reservation</span><span class="detail-value" style="color:#7b82a8;font-family:monospace">' + issue.reservation_id + '</span></div>' +
