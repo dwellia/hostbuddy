@@ -106,6 +106,7 @@ async function processActionItem(
       priority: decision.task_priority,
       assigneeGid: assignee?.asanaUserId || null,
       projectGid: property.asanaProjectId,
+        sectionGid: property.asanaSectionId || null,
       dueDate,
     });
     taskCreated = result.task.success;

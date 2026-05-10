@@ -15,11 +15,11 @@ export interface Property {
   id: string;
   name: string;
   location: string;
-  contactKey: string;       // key into TEAM who receives alerts for this property
+  contactKey: string;
   asanaProjectId: string;
+  asanaSectionId: string; // "New Tasks" section
 }
 
-// ── Team ──────────────────────────────────────────────────────────────────────
 export const TEAM: Record<string, TeamMember> = {
   ryan: {
     name: "Ryan",
@@ -33,7 +33,6 @@ export const TEAM: Record<string, TeamMember> = {
   },
 };
 
-// ── Properties ────────────────────────────────────────────────────────────────
 export const PROPERTIES: Record<string, Property> = {
   "delta-dawn": {
     id: "delta-dawn",
@@ -41,6 +40,7 @@ export const PROPERTIES: Record<string, Property> = {
     location: "Sevierville, TN",
     contactKey: "ryan",
     asanaProjectId: process.env.ASANA_PROJECT_DELTA_DAWN || "",
+    asanaSectionId: "1202800056668818",
   },
   legobii: {
     id: "legobii",
@@ -48,10 +48,9 @@ export const PROPERTIES: Record<string, Property> = {
     location: "Kissimmee, FL",
     contactKey: "amanda",
     asanaProjectId: process.env.ASANA_PROJECT_LEGOBII || "",
+    asanaSectionId: "1204093776126081",
   },
 };
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 export function getContact(propertyId: string): TeamMember | null {
   const property = PROPERTIES[propertyId];

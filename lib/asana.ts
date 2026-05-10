@@ -28,7 +28,8 @@ export async function createTask(options: {
   priority: "low" | "medium" | "high";
   assigneeGid: string | null;
   projectGid: string;
-  dueDate: string; // YYYY-MM-DD
+  sectionGid: string | null;
+  dueDate: string;
 }): Promise<AsanaCreateResult> {
   try {
     if (!options.projectGid) {
@@ -53,6 +54,7 @@ export async function createTask(options: {
       taskBody.assignee = options.assigneeGid;
     }
 
+    // Create the task
     const res = await fetch(`${ASANA_API_BASE}/tasks`, {
       method: "POST",
       headers: asanaHeaders(),
@@ -70,6 +72,16 @@ export async function createTask(options: {
     const taskUrl = taskId
       ? `https://app.asana.com/0/${options.projectGid}/${taskId}`
       : undefined;
+
+    // Move task to the correct section if provided
+    if (taskId && options.sectionGid) {
+      await fetch(`${ASANA_API_BASE}/sections/${options.sectionGid}/addTask`, {
+        method: "POST",
+        headers: asanaHeaders(),
+        body: JSON.stringify({ data: { task: taskId } }),
+      });
+      console.log(`[Asana] ✓ moved task to section ${options.sectionGid}`);
+    }
 
     console.log(`[Asana] ✓ created task ${taskId}`);
     return { success: true, taskId, taskUrl };
