@@ -2,12 +2,12 @@ var allIssues = [];
 var charts = {};
 
 var CATEGORY_COLORS = {
-  'CLEANLINESS': '#6c8ef5',
-  'GUEST REQUESTS': '#a78bfa',
-  'MAINTENANCE': '#f5a623',
-  'RESERVATION CHANGES': '#4caf7d',
-  'SUPPLY': '#e05c5c',
-  'OTHER': '#7b82a8'
+  'CLEANLINESS': '#4caf7d',
+  'GUEST REQUESTS': '#f5a623',
+  'MAINTENANCE': '#e05c5c',
+  'RESERVATION CHANGES': '#7b82a8',
+  'SUPPLY': '#00bcd4',
+  'OTHER': '#9c27b0'
 };
 
 function categoryColor(cat) {
