@@ -154,7 +154,7 @@ function render() {
   var propLabels = Object.keys(m.byProperty);
   charts.property = new Chart(document.getElementById('chartProperty'), {
     type: 'doughnut',
-    data: { labels: propLabels, datasets: [{ data: propLabels.map(function(l) { return m.byProperty[l]; }), backgroundColor: propLabels.map(function(l) { return l.toLowerCase().includes('delta') ? 'rgba(108,142,245,0.7)' : 'rgba(167,139,250,0.7)'; }), borderWidth: 0 }] },
+    data: { labels: propLabels, datasets: [{ data: propLabels.map(function(l) { return m.byProperty[l]; }), backgroundColor: propLabels.map(function(l) { return l.toLowerCase().includes('delta') ? 'rgba(76,175,125,0.8)' : 'rgba(245,166,35,0.8)'; }), borderWidth: 0 }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#7b82a8', font: { size: 11 }, boxWidth: 10, padding: 8 } } } }
   });
 
