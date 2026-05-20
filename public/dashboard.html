@@ -36,17 +36,35 @@
     body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; min-height: 100vh; }
 
     /* Header */
-    .header { background: #fff; border-bottom: 1px solid var(--border); padding: 0 28px; height: 54px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; position: sticky; top: 0; z-index: 100; }
-    .header-center { text-align: center; font-size: 22px; font-weight: 800; color: var(--blue); letter-spacing: -0.5px; font-family: 'DM Sans', sans-serif; }
-    .header-right { display: flex; align-items: center; gap: 12px; justify-content: flex-end; }
-    .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+    .header {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      height: 54px;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-center {
+      text-align: center;
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--blue);
+      letter-spacing: -0.3px;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .header-right { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+    .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; flex-shrink: 0; }
     .live-label { font-size: 11px; font-weight: 600; color: var(--text-2); }
-    .last-updated { font-size: 11px; color: var(--text-3); }
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
 
     /* Time toggle */
-    .time-toggle { display: flex; gap: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 3px; }
-    .tt-btn { padding: 4px 12px; border-radius: 6px; border: none; background: none; font-size: 11px; font-weight: 600; color: var(--text-3); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.13s; letter-spacing: 0.02em; }
+    .time-toggle { display: flex; gap: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 3px; flex-wrap: wrap; justify-content: center; }
+    .tt-btn { padding: 4px 10px; border-radius: 6px; border: none; background: none; font-size: 11px; font-weight: 600; color: var(--text-3); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.13s; letter-spacing: 0.02em; white-space: nowrap; }
     .tt-btn.active { background: #fff; color: var(--blue); box-shadow: var(--shadow); }
 
     /* Layout */
@@ -60,32 +78,26 @@
 
     /* Section headers */
     .section-block { padding: 22px 0 0; }
-    .sh { display: flex; align-items: center; gap: 12px; margin-bottom: 13px; }
+    .sh { display: flex; align-items: center; gap: 12px; margin-bottom: 13px; flex-wrap: wrap; }
     .sh-label { font-size: 10px; font-weight: 800; letter-spacing: 0.10em; text-transform: uppercase; color: var(--text-3); white-space: nowrap; }
-    .sh-rule { flex: 1; height: 1px; background: rgba(0,0,0,0.09); }
+    .sh-rule { flex: 1; height: 1px; background: rgba(0,0,0,0.09); min-width: 20px; }
 
     /* Cards */
     .card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); position: relative; }
     .clabel { font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-3); margin-bottom: 12px; }
     .cvalue { font-family: 'DM Mono', monospace; font-size: 28px; font-weight: 600; line-height: 1; letter-spacing: -0.02em; margin-bottom: 3px; }
     .cvalue.blue   { color: var(--blue); }
-    .cvalue.orange { color: var(--orange); }
     .cvalue.green  { color: var(--green); }
     .cvalue.red    { color: var(--red); }
     .csub { font-size: 11px; color: var(--text-3); font-weight: 500; }
 
-    /* Stat grid inside card */
-    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .stat-blk { background: var(--bg); border-radius: var(--radius-sm); padding: 10px 12px; }
-    .stat-val { font-family: 'DM Mono', monospace; font-size: 17px; font-weight: 600; margin-bottom: 2px; }
-    .stat-lbl { font-size: 10px; color: var(--text-3); font-weight: 600; letter-spacing: 0.04em; }
-
     /* Chart */
     .chart-wrap { position: relative; height: 190px; }
 
-    /* Filters bar */
-    .filters-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 13px; }
-    .filters-bar label { font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-3); }
+    /* Filters */
+    .filters-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .filter-group { display: flex; align-items: center; gap: 6px; }
+    .filter-group label { font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-3); white-space: nowrap; }
     select { background: #fff; border: 1px solid var(--border); color: var(--text); padding: 5px 10px; border-radius: var(--radius-sm); font-size: 12px; font-family: 'DM Sans', sans-serif; font-weight: 500; cursor: pointer; box-shadow: var(--shadow); }
     select:focus { outline: 2px solid var(--blue-mid); }
 
@@ -93,11 +105,9 @@
     .badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 20px; font-size: 10.5px; font-weight: 600; white-space: nowrap; }
     .badge.green   { background: var(--green-lt); color: var(--green); }
     .badge.red     { background: var(--red-lt); color: var(--red); }
-    .badge.amber   { background: var(--amber-lt); color: var(--amber); }
     .badge.blue    { background: var(--blue-mid); color: var(--blue); }
     .badge.orange  { background: var(--orange-lt); color: var(--orange); }
     .badge.gray    { background: rgba(107,114,128,0.09); color: #6b7280; }
-    .badge.purple  { background: rgba(124,58,237,0.09); color: #7c3aed; }
     .badge.teal    { background: rgba(13,148,136,0.09); color: #0d9488; }
 
     /* Property tags */
@@ -155,20 +165,32 @@
 
     /* Responsive */
     @media (max-width: 1100px) { .c3, .c4 { grid-column: span 6; } }
-    @media (max-width: 768px) { .c3,.c4,.c6,.c8 { grid-column: span 12; } .page { padding: 16px 16px 48px; } }
+    @media (max-width: 768px) {
+      .c3,.c4,.c6,.c8 { grid-column: span 12; }
+      .page { padding: 14px 12px 48px; }
+      .header { padding: 0 12px; height: 50px; }
+      .header-center { font-size: 14px; }
+      .header-logo img { height: 24px; }
+      /* Mobile filters — stack vertically in their own card */
+      .filters-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .filter-group { width: 100%; }
+      .filter-group select { flex: 1; width: 100%; }
+      /* Hide last-updated on mobile */
+      .last-updated { display: none; }
+    }
   </style>
 </head>
 <body>
 
 <header class="header">
   <div class="header-logo">
-    <img src="https://bookdwellia.com/images/dwellia-logo.png" alt="Dwellia" height="28">
+    <img src="https://bookdwellia.com/d-logo.png" alt="Dwellia" height="28">
   </div>
   <div class="header-center">HostBuddy Action Items</div>
   <div class="header-right">
     <div class="live-dot"></div>
     <span class="live-label">Live</span>
-    <span class="last-updated" id="lastUpdated">Loading...</span>
+    <span class="last-updated" id="lastUpdated"></span>
   </div>
 </header>
 
@@ -176,9 +198,7 @@
 
   <!-- Time toggle -->
   <div style="display:flex;justify-content:center;padding:18px 0 6px;">
-    <div class="time-toggle" id="timeToggle">
-      <!-- Populated dynamically by dashboard.js -->
-    </div>
+    <div class="time-toggle" id="timeToggle"></div>
   </div>
 
   <!-- Stats -->
@@ -193,15 +213,15 @@
   <div class="section-block">
     <div class="sh"><span class="sh-label">Breakdown</span><div class="sh-rule"></div></div>
     <div class="grid">
-      <div class="card c4" id="chartCategoryCard">
+      <div class="card c4">
         <div class="clabel">By Category</div>
         <div class="chart-wrap"><canvas id="chartCategory"></canvas></div>
       </div>
-      <div class="card c4" id="chartPropertyCard">
+      <div class="card c4">
         <div class="clabel">By Property</div>
         <div class="chart-wrap"><canvas id="chartProperty"></canvas></div>
       </div>
-      <div class="card c4" id="repeatIssuesCard" style="overflow-y:auto;max-height:260px;">
+      <div class="card c4" id="repeatIssuesCard" style="overflow-y:auto;max-height:270px;">
         <div class="clabel">Repeat Issues</div>
         <div style="padding:24px 0;text-align:center;color:var(--text-3);font-size:12px;">Loading...</div>
       </div>
@@ -213,29 +233,36 @@
     <div class="sh">
       <span class="sh-label">Issue Log</span>
       <div class="sh-rule"></div>
-      <div class="filters-bar" style="margin-bottom:0;">
-        <label>Property</label>
-        <select id="filterProperty">
-          <option value="all">All</option>
-          <option value="delta-dawn">Delta Dawn</option>
-          <option value="legobii">LeGobi Villa</option>
-        </select>
-        <label>Category</label>
-        <select id="filterCategory">
-          <option value="all">All</option>
-          <option>CLEANLINESS</option>
-          <option>GUEST REQUESTS</option>
-          <option>MAINTENANCE</option>
-          <option>SUPPLY</option>
-          <option>OTHER</option>
-        </select>
-        <label>Type</label>
-        <select id="filterType">
-          <option value="all">All</option>
-          <option value="urgent">Urgent</option>
-          <option value="next_clean">Next Clean</option>
-          <option value="none">No Action</option>
-        </select>
+      <!-- Filters inline on desktop, stacked on mobile -->
+      <div class="filters-row">
+        <div class="filter-group">
+          <label>Property</label>
+          <select id="filterProperty">
+            <option value="all">All</option>
+            <option value="delta-dawn">Delta Dawn</option>
+            <option value="legobii">LeGobi Villa</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Category</label>
+          <select id="filterCategory">
+            <option value="all">All</option>
+            <option>CLEANLINESS</option>
+            <option>GUEST REQUESTS</option>
+            <option>MAINTENANCE</option>
+            <option>SUPPLY</option>
+            <option>OTHER</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Type</label>
+          <select id="filterType">
+            <option value="all">All</option>
+            <option value="urgent">Urgent</option>
+            <option value="next_clean">Next Clean</option>
+            <option value="none">No Action</option>
+          </select>
+        </div>
       </div>
       <span id="issueCount" style="font-size:11px;font-weight:600;color:var(--text-3);white-space:nowrap;"></span>
     </div>
