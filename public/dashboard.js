@@ -1,5 +1,6 @@
 var allIssues = [];
 var charts = {};
+var activeRange = 'all';
 
 var CATEGORY_COLORS = {
   'CLEANLINESS':        '#1179EB',
@@ -42,14 +43,26 @@ function deleteIssue(id, event) {
     .catch(function(err) { alert('Delete failed: ' + err.message); });
 }
 
+function getTimeRangeCutoff(range) {
+  var now = new Date();
+  if (range === '3mo') { var d = new Date(now); d.setMonth(d.getMonth() - 3); return d; }
+  if (range === '6mo') { var d = new Date(now); d.setMonth(d.getMonth() - 6); return d; }
+  if (range === 'ytd') { return new Date(now.getFullYear(), 0, 1); }
+  if (range === '1yr') { var d = new Date(now); d.setFullYear(d.getFullYear() - 1); return d; }
+  return null;
+}
+
 function getFiltered() {
   var prop = document.getElementById('filterProperty').value;
   var cat = document.getElementById('filterCategory').value;
   var type = document.getElementById('filterType').value;
+  var cutoff = getTimeRangeCutoff(activeRange);
   return allIssues.filter(function(issue) {
+    if (issue.category === 'RESERVATION CHANGES') return false;
     if (prop !== 'all' && issue.property_id !== prop) return false;
     if (cat !== 'all' && issue.category !== cat) return false;
     if (type !== 'all' && issue.task_type !== type) return false;
+    if (cutoff && new Date(issue.timestamp) < cutoff) return false;
     return true;
   });
 }
@@ -240,6 +253,17 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('modalOverlay').addEventListener('click', function(e) {
     if (e.target === document.getElementById('modalOverlay')) closeModal();
   });
+
+  // Time toggle
+  document.querySelectorAll('.tt-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.tt-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      activeRange = btn.getAttribute('data-range');
+      render();
+    });
+  });
+
   loadData();
   setInterval(loadData, 60000);
 });
