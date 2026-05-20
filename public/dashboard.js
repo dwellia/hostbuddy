@@ -336,47 +336,27 @@ function renderRepeatIssues(issues) {
   // Show loading state while Claude summarizes
   renderRepeatRows(clusters, card);
 
-  // Ask Claude to summarize each cluster in 3-5 words
-  var descriptions = clusters.slice(0, 10).map(function(c) {
-    return c.issues.map(function(i) { return i.action_item; }).join(' | ');
+  // Ask Claude (via server endpoint) to summarize each cluster
+  var groups = clusters.slice(0, 10).map(function(c) {
+    return c.issues.map(function(i) { return i.action_item; });
   });
 
-  fetch('https://api.anthropic.com/v1/messages', {
+  fetch('/api/summarize-issues', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 300,
-      messages: [{
-        role: 'user',
-        content: 'Summarize each of the following vacation rental issue groups in 3-5 words maximum. Be broad and general. Examples: "Hot tub not heating", "Insufficient towel supply", "Arcade game malfunction", "WiFi connectivity issues". Return ONLY a JSON array of strings, one per group, no explanation.\n\nGroups:\n' +
-          descriptions.map(function(d, i) { return (i + 1) + '. ' + d; }).join('\n')
-      }]
-    })
+    body: JSON.stringify({ groups: groups })
   })
   .then(function(res) { return res.json(); })
   .then(function(data) {
-    var text = data.content && data.content[0] ? data.content[0].text : '[]';
-    var cleaned = text.replace(/```json\n?|```\n?/g, '').trim();
-    var labels = JSON.parse(cleaned);
+    var labels = data.labels || [];
     clusters.forEach(function(c, i) { if (labels[i]) c.label = labels[i]; });
     renderRepeatRows(clusters, card);
   })
   .catch(function() {
-    // Fallback — just show top keywords if Claude fails
+    // Fallback — use the raw action_item text trimmed
     clusters.forEach(function(c) {
       if (c.label === '…') {
-        var words = c.issues[0].action_item
-          .replace(/[^a-zA-Z\s]/g, ' ')
-          .replace(STOPWORDS, ' ')
-          .replace(/\s+/g, ' ')
-          .trim()
-          .split(' ')
-          .filter(function(w) { return w.length > 3; })
-          .slice(0, 3)
-          .map(function(w) { return w.charAt(0).toUpperCase() + w.slice(1); })
-          .join(' ');
-        c.label = words || 'Unknown issue';
+        c.label = c.issues[0].action_item.slice(0, 55) + (c.issues[0].action_item.length > 55 ? '…' : '');
       }
     });
     renderRepeatRows(clusters, card);
