@@ -37,7 +37,7 @@
 
     /* Header */
     .header { background: #fff; border-bottom: 1px solid var(--border); padding: 0 28px; height: 54px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; position: sticky; top: 0; z-index: 100; }
-    .header-center { text-align: center; font-size: 13px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+    .header-center { text-align: center; font-size: 22px; font-weight: 800; color: var(--blue); letter-spacing: -0.5px; font-family: 'DM Sans', sans-serif; }
     .header-right { display: flex; align-items: center; gap: 12px; justify-content: flex-end; }
     .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
     .live-label { font-size: 11px; font-weight: 600; color: var(--text-2); }
@@ -176,12 +176,8 @@
 
   <!-- Time toggle -->
   <div style="display:flex;justify-content:center;padding:18px 0 6px;">
-    <div class="time-toggle">
-      <button class="tt-btn" data-range="3mo">3 Mo</button>
-      <button class="tt-btn" data-range="6mo">6 Mo</button>
-      <button class="tt-btn" data-range="ytd">YTD</button>
-      <button class="tt-btn" data-range="1yr">Last Year</button>
-      <button class="tt-btn active" data-range="all">All Time</button>
+    <div class="time-toggle" id="timeToggle">
+      <!-- Populated dynamically by dashboard.js -->
     </div>
   </div>
 
@@ -205,9 +201,9 @@
         <div class="clabel">By Property</div>
         <div class="chart-wrap"><canvas id="chartProperty"></canvas></div>
       </div>
-      <div class="card c4" id="chartTimeCard">
-        <div class="clabel">Issues Over Time</div>
-        <div class="chart-wrap"><canvas id="chartTime"></canvas></div>
+      <div class="card c4" id="repeatIssuesCard" style="overflow-y:auto;max-height:260px;">
+        <div class="clabel">Repeat Issues</div>
+        <div style="padding:24px 0;text-align:center;color:var(--text-3);font-size:12px;">Loading...</div>
       </div>
     </div>
   </div>
