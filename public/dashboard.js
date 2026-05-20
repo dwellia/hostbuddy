@@ -2,16 +2,15 @@ var allIssues = [];
 var charts = {};
 
 var CATEGORY_COLORS = {
-  'CLEANLINESS': '#4caf7d',
-  'GUEST REQUESTS': '#f5a623',
-  'MAINTENANCE': '#e05c5c',
-  'RESERVATION CHANGES': '#7b82a8',
-  'SUPPLY': '#00bcd4',
-  'OTHER': '#9c27b0'
+  'CLEANLINESS':        '#1179EB',
+  'GUEST REQUESTS':     '#F38B2B',
+  'MAINTENANCE':        '#dc2626',
+  'SUPPLY':             '#0d9488',
+  'OTHER':              '#9ca3af'
 };
 
 function categoryColor(cat) {
-  return CATEGORY_COLORS[cat] || '#7b82a8';
+  return CATEGORY_COLORS[cat] || '#9ca3af';
 }
 
 function loadData() {
@@ -19,11 +18,11 @@ function loadData() {
     .then(function(res) { return res.json(); })
     .then(function(data) {
       allIssues = data.issues || [];
-      document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+      document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) + ' ET';
       render();
     })
     .catch(function(err) {
-      document.getElementById('content').innerHTML = '<div class="loading">Failed to load data: ' + err.message + '</div>';
+      document.getElementById('statsGrid').innerHTML = '<div class="loading-state c12">Failed to load: ' + err.message + '</div>';
     });
 }
 
@@ -73,100 +72,127 @@ function buildMetrics(issues) {
 
 function formatDate(ts) {
   var d = new Date(ts);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }) +
+    ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });
 }
 
-function taskTypeBadge(type) {
-  if (type === 'urgent') return '<span class="badge badge-urgent">Urgent</span>';
-  if (type === 'next_clean') return '<span class="badge badge-nextclean">Next Clean</span>';
-  return '<span class="badge badge-no">—</span>';
+function typeBadge(type) {
+  if (type === 'urgent')     return '<span class="badge red">Urgent</span>';
+  if (type === 'next_clean') return '<span class="badge green">Next Clean</span>';
+  return '<span class="badge gray">—</span>';
+}
+
+function catBadge(cat) {
+  var colorMap = {
+    'CLEANLINESS': 'blue', 'GUEST REQUESTS': 'orange',
+    'MAINTENANCE': 'red', 'SUPPLY': 'teal', 'OTHER': 'gray'
+  };
+  var cls = colorMap[cat] || 'gray';
+  return '<span class="badge ' + cls + '">' + cat + '</span>';
 }
 
 function render() {
   var issues = getFiltered();
   var m = buildMetrics(issues);
 
-  var tableRows = '';
-  issues.forEach(function(issue, i) {
-    var propBadge = issue.property_id === 'delta-dawn' ? 'badge-dd' : 'badge-lg';
-    var propLabel = issue.property_id === 'delta-dawn' ? 'Delta Dawn' : 'LeGobi';
-    var smsColor = issue.sms_sent ? 'color:#4caf7d' : 'color:#7b82a8';
-    var taskColor = issue.task_created ? 'color:#4caf7d' : 'color:#7b82a8';
-    tableRows += '<tr data-index="' + i + '" data-id="' + issue.id + '">' +
-      '<td style="white-space:nowrap;color:#7b82a8">' + formatDate(issue.timestamp) + '</td>' +
-      '<td><span class="badge ' + propBadge + '">' + propLabel + '</span></td>' +
-      '<td>' + (issue.guest_name || '—') + '</td>' +
-      '<td><span class="badge badge-cat">' + issue.category + '</span></td>' +
-      '<td><span class="truncate">' + issue.action_item + '</span></td>' +
-      '<td>' + taskTypeBadge(issue.task_type) + '</td>' +
-      '<td style="' + smsColor + '">' + (issue.sms_sent ? '✓' : '—') + '</td>' +
-      '<td style="' + taskColor + '">' + (issue.task_created ? '✓' : '—') + '</td>' +
-      '<td><button class="delete-btn" data-id="' + issue.id + '">&#x2715;</button></td>' +
-      '</tr>';
-  });
+  // Stats
+  document.getElementById('statsGrid').innerHTML =
+    statCard('Total Issues',  m.total,       'All flagged action items', 'blue') +
+    statCard('Urgent',        m.urgent,      'Visit requested',          'red') +
+    statCard('Next Clean',    m.nextClean,   'Fix at turnover',          'green') +
+    statCard('Tasks Created', m.tasksCreated,'In Asana',                 '');
 
-  var tableContent = issues.length === 0
-    ? '<div class="empty"><div class="icon">📋</div><p>No issues yet.</p></div>'
-    : '<div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Property</th><th>Guest</th><th>Category</th><th>Action Item</th><th>Type</th><th>SMS</th><th>Task</th><th></th></tr></thead><tbody>' + tableRows + '</tbody></table></div>';
+  // Issue count label
+  document.getElementById('issueCount').textContent = issues.length + ' issue' + (issues.length !== 1 ? 's' : '');
 
-  document.getElementById('content').innerHTML =
-    '<div class="stats">' +
-      '<div class="stat-card accent"><div class="label">Total Issues</div><div class="value">' + m.total + '</div><div class="sub">All flagged action items</div></div>' +
-      '<div class="stat-card orange"><div class="label">Urgent</div><div class="value">' + m.urgent + '</div><div class="sub">Visit requested</div></div>' +
-      '<div class="stat-card green"><div class="label">Next Clean</div><div class="value">' + m.nextClean + '</div><div class="sub">Fix at turnover</div></div>' +
-      '<div class="stat-card"><div class="label">Tasks Created</div><div class="value">' + m.tasksCreated + '</div><div class="sub">In Asana</div></div>' +
-    '</div>' +
-    '<div class="charts">' +
-      '<div class="chart-card"><h3>By Category</h3><div class="chart-wrap"><canvas id="chartCategory"></canvas></div></div>' +
-      '<div class="chart-card"><h3>By Property</h3><div class="chart-wrap"><canvas id="chartProperty"></canvas></div></div>' +
-      '<div class="chart-card"><h3>Issues Over Time</h3><div class="chart-wrap"><canvas id="chartTime"></canvas></div></div>' +
-    '</div>' +
-    '<div class="table-card">' +
-      '<div class="table-header"><h3>Issue Log</h3><span class="count">' + issues.length + ' issues</span></div>' +
-      tableContent +
-    '</div>';
+  // Table
+  if (issues.length === 0) {
+    document.getElementById('tableContent').innerHTML =
+      '<div class="empty-state"><div class="icon">📋</div><p>No issues yet. They\'ll appear here once HostbuddyAI fires its first webhook.</p></div>';
+  } else {
+    var rows = '';
+    issues.forEach(function(issue, i) {
+      var isDelta = issue.property_id === 'delta-dawn';
+      var propTag = '<span class="tprop ' + (isDelta ? 'dd' : 'lg') + '">' + (isDelta ? 'Delta Dawn' : 'LeGobi') + '</span>';
+      rows += '<tr data-index="' + i + '" data-id="' + issue.id + '">' +
+        '<td><span class="td-date">' + formatDate(issue.timestamp) + '</span></td>' +
+        '<td>' + propTag + '</td>' +
+        '<td style="font-size:12.5px;font-weight:500;color:var(--text-2)">' + (issue.guest_name || '—') + '</td>' +
+        '<td>' + catBadge(issue.category) + '</td>' +
+        '<td><span class="truncate">' + issue.action_item + '</span></td>' +
+        '<td>' + typeBadge(issue.task_type) + '</td>' +
+        '<td style="text-align:center;font-size:13px;color:' + (issue.sms_sent ? 'var(--green)' : 'var(--text-3)') + '">' + (issue.sms_sent ? '✓' : '—') + '</td>' +
+        '<td style="text-align:center;font-size:13px;color:' + (issue.task_created ? 'var(--green)' : 'var(--text-3)') + '">' + (issue.task_created ? '✓' : '—') + '</td>' +
+        '<td><button class="del-btn" data-id="' + issue.id + '">✕</button></td>' +
+        '</tr>';
+    });
+    document.getElementById('tableContent').innerHTML =
+      '<div class="table-wrap"><table>' +
+      '<thead><tr><th>Date (ET)</th><th>Property</th><th>Guest</th><th>Category</th><th>Action Item</th><th>Type</th><th style="text-align:center">SMS</th><th style="text-align:center">Task</th><th></th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div>';
+  }
 
+  // Destroy old charts
   Object.keys(charts).forEach(function(k) { charts[k].destroy(); });
   charts = {};
 
   if (!issues.length) return;
 
+  // Row clicks
   document.querySelectorAll('tbody tr').forEach(function(row) {
     row.addEventListener('click', function(e) {
-      if (e.target.classList.contains('delete-btn')) return;
+      if (e.target.classList.contains('del-btn')) return;
       openModal(parseInt(row.getAttribute('data-index')));
     });
   });
-
-  document.querySelectorAll('.delete-btn').forEach(function(btn) {
-    btn.addEventListener('click', function(e) {
-      deleteIssue(btn.getAttribute('data-id'), e);
-    });
+  document.querySelectorAll('.del-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) { deleteIssue(btn.getAttribute('data-id'), e); });
   });
 
+  // Category chart
   var catLabels = Object.keys(m.byCategory);
-  charts.category = new Chart(document.getElementById('chartCategory'), {
-    type: 'doughnut',
-    data: { labels: catLabels, datasets: [{ data: catLabels.map(function(l) { return m.byCategory[l]; }), backgroundColor: catLabels.map(categoryColor), borderWidth: 0 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#7b82a8', font: { size: 11 }, boxWidth: 10, padding: 8 } } } }
-  });
+  if (catLabels.length && document.getElementById('chartCategory')) {
+    charts.category = new Chart(document.getElementById('chartCategory'), {
+      type: 'doughnut',
+      data: { labels: catLabels, datasets: [{ data: catLabels.map(function(l) { return m.byCategory[l]; }), backgroundColor: catLabels.map(categoryColor), borderWidth: 2, borderColor: '#fff' }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#9ca3af', font: { size: 10, family: 'DM Sans' }, boxWidth: 9, padding: 8 } } }, cutout: '62%' }
+    });
+  }
 
+  // Property chart
   var propLabels = Object.keys(m.byProperty);
-  charts.property = new Chart(document.getElementById('chartProperty'), {
-    type: 'doughnut',
-    data: { labels: propLabels, datasets: [{ data: propLabels.map(function(l) { return m.byProperty[l]; }), backgroundColor: propLabels.map(function(l) { return l.toLowerCase().includes('delta') ? 'rgba(76,175,125,0.8)' : 'rgba(245,166,35,0.8)'; }), borderWidth: 0 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#7b82a8', font: { size: 11 }, boxWidth: 10, padding: 8 } } } }
-  });
+  if (propLabels.length && document.getElementById('chartProperty')) {
+    charts.property = new Chart(document.getElementById('chartProperty'), {
+      type: 'doughnut',
+      data: { labels: propLabels, datasets: [{ data: propLabels.map(function(l) { return m.byProperty[l]; }), backgroundColor: propLabels.map(function(l) { return l.toLowerCase().includes('delta') ? '#1179EB' : '#F38B2B'; }), borderWidth: 2, borderColor: '#fff' }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#9ca3af', font: { size: 10, family: 'DM Sans' }, boxWidth: 9, padding: 8 } } }, cutout: '62%' }
+    });
+  }
 
+  // Time chart
   var months = Object.keys(m.byMonth).sort();
-  charts.time = new Chart(document.getElementById('chartTime'), {
-    type: 'line',
-    data: {
-      labels: months.map(function(mo) { var p = mo.split('-'); return new Date(parseInt(p[0]), parseInt(p[1]) - 1).toLocaleString('default', { month: 'short', year: '2-digit' }); }),
-      datasets: [{ data: months.map(function(mo) { return m.byMonth[mo]; }), borderColor: '#6c8ef5', backgroundColor: 'rgba(108,142,245,0.1)', fill: true, tension: 0.3, pointRadius: 4, pointBackgroundColor: '#6c8ef5' }]
-    },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#7b82a8', font: { size: 11 } }, grid: { display: false } }, y: { ticks: { color: '#7b82a8', font: { size: 11 } }, grid: { color: '#2e3352' } } } }
-  });
+  if (months.length && document.getElementById('chartTime')) {
+    charts.time = new Chart(document.getElementById('chartTime'), {
+      type: 'line',
+      data: {
+        labels: months.map(function(mo) { var p = mo.split('-'); return new Date(parseInt(p[0]), parseInt(p[1]) - 1).toLocaleString('default', { month: 'short', year: '2-digit' }); }),
+        datasets: [{ data: months.map(function(mo) { return m.byMonth[mo]; }), borderColor: '#1179EB', backgroundColor: 'rgba(17,121,235,0.08)', fill: true, tension: 0.35, pointRadius: 4, pointBackgroundColor: '#1179EB', pointBorderColor: '#fff', pointBorderWidth: 2 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#9ca3af', font: { size: 10, family: 'DM Sans' } }, grid: { display: false }, border: { display: false } },
+          y: { ticks: { color: '#9ca3af', font: { size: 10, family: 'DM Sans' }, stepSize: 1 }, grid: { color: 'rgba(0,0,0,0.05)' }, border: { display: false } }
+        }
+      }
+    });
+  }
+}
+
+function statCard(label, value, sub, colorClass) {
+  var valHtml = '<div class="cvalue ' + colorClass + '">' + value + '</div>';
+  return '<div class="card c3"><div class="clabel">' + label + '</div>' + valHtml + '<div class="csub">' + sub + '</div></div>';
 }
 
 function openModal(index) {
@@ -176,23 +202,30 @@ function openModal(index) {
 
   document.getElementById('modalTitle').textContent = issue.action_item;
 
+  var isDelta = issue.property_id === 'delta-dawn';
+  var propTag = '<span class="tprop ' + (isDelta ? 'dd' : 'lg') + '">' + issue.property + '</span>';
+
   var taskLink = issue.asana_task_url
-    ? '<a class="asana-link" href="' + issue.asana_task_url + '" target="_blank">View task &#x2197;</a>'
-    : (issue.task_created ? '&#x2713; Created' : '&#x2014;');
+    ? '<a class="asana-link" href="' + issue.asana_task_url + '" target="_blank">View in Asana ↗</a>'
+    : (issue.task_created ? '✓ Created' : '—');
 
   document.getElementById('modalBody').innerHTML =
     '<div class="reasoning-box">' + issue.claude_reasoning + '</div>' +
-    '<div class="detail-row"><span class="detail-label">Date</span><span class="detail-value">' + new Date(issue.timestamp).toLocaleString('en-US', { timeZone: 'America/New_York' }) + '</span></div>' +
-    '<div class="detail-row"><span class="detail-label">Property</span><span class="detail-value"><span class="badge ' + (issue.property_id === 'delta-dawn' ? 'badge-dd' : 'badge-lg') + '">' + issue.property + '</span></span></div>' +
-    '<div class="detail-row"><span class="detail-label">Guest</span><span class="detail-value">' + (issue.guest_name || '—') + '</span></div>' +
-    '<div class="detail-row"><span class="detail-label">Reservation</span><span class="detail-value" style="color:#7b82a8;font-family:monospace">' + issue.reservation_id + '</span></div>' +
-    '<div class="detail-row"><span class="detail-label">Category</span><span class="detail-value"><span class="badge badge-cat">' + issue.category + '</span></span></div>' +
-    '<div class="detail-row"><span class="detail-label">Type</span><span class="detail-value">' + taskTypeBadge(issue.task_type) + '</span></div>' +
-    '<div class="detail-row"><span class="detail-label">SMS Sent</span><span class="detail-value" style="color:' + (issue.sms_sent ? '#4caf7d' : '#7b82a8') + '">' + (issue.sms_sent ? '&#x2713; Sent to ' + issue.notified_contact : 'Not sent') + '</span></div>' +
-    '<div class="detail-row"><span class="detail-label">Asana Task</span><span class="detail-value">' + taskLink + '</span></div>' +
-    '<div class="detail-row"><span class="detail-label">Conversation</span><span class="detail-value">' + issue.conversation_length + ' messages from Hospitable</span></div>';
+    detailRow('Date', '<span style="font-family:DM Mono,monospace;font-size:12px">' + new Date(issue.timestamp).toLocaleString('en-US', { timeZone: 'America/New_York' }) + ' ET</span>') +
+    detailRow('Property', propTag) +
+    detailRow('Guest', issue.guest_name || '—') +
+    detailRow('Reservation', '<span style="font-family:DM Mono,monospace;font-size:12px;color:var(--text-3)">' + issue.reservation_id + '</span>') +
+    detailRow('Category', catBadge(issue.category)) +
+    detailRow('Type', typeBadge(issue.task_type)) +
+    detailRow('SMS Sent', issue.sms_sent ? '<span style="color:var(--green);font-weight:600">✓ Sent to ' + issue.notified_contact + '</span>' : '<span style="color:var(--text-3)">Not sent</span>') +
+    detailRow('Asana Task', taskLink) +
+    detailRow('Conversation', issue.conversation_length + ' messages from Hospitable');
 
   document.getElementById('modalOverlay').classList.add('open');
+}
+
+function detailRow(label, value) {
+  return '<div class="detail-row"><span class="dlabel">' + label + '</span><span class="dval">' + value + '</span></div>';
 }
 
 function closeModal() {
