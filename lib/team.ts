@@ -52,6 +52,11 @@ export const PROPERTIES: Record<string, Property> = {
   },
 };
 
+// STR Tasks project — for non-housekeeper action items (guest requests, cleanliness, etc.)
+export const STR_TASKS_PROJECT_GID = "1214955401068301";
+export const STR_TASKS_JORDAN_SECTION_GID = "1214955401068304";
+export const JORDAN_USER_GID = process.env.ASANA_USER_JORDAN || "1200027663054269";
+
 export function getContact(propertyId: string): TeamMember | null {
   const property = PROPERTIES[propertyId];
   if (!property) return null;

@@ -3,13 +3,19 @@
  */
 
 import { getRoutingDecision } from "./claude";
-import { getReservationMessages, getCheckoutDate } from "./hospitable";
+import { getReservationMessages, getCheckoutDate, getReservationDetails, getPaymentRequestUrl } from "./hospitable";
 import { sendSMS, sendUrgentCallSMS } from "./quo";
 import { createTask } from "./asana";
-import { saveIssue } from "./db";
-import { TEAM, PROPERTIES } from "./team";
+import { saveIssue, savePendingCheckInOut } from "./db";
+import { TEAM, PROPERTIES, STR_TASKS_PROJECT_GID, STR_TASKS_JORDAN_SECTION_GID, JORDAN_USER_GID } from "./team";
 import type { HostbuddyActionItem, HostbuddyPayload, PipelineResult } from "./types";
 import { randomUUID } from "crypto";
+
+// Categories that should SMS Ryan/Amanda
+const HOUSEKEEPER_SMS_CATEGORIES = ["MAINTENANCE", "SUPPLY"];
+
+// Business number for payment request reminders
+const BUSINESS_PHONE = "+18652811917";
 
 export async function processWebhook(
   payload: HostbuddyPayload
@@ -27,7 +33,26 @@ async function processActionItem(
 ): Promise<PipelineResult> {
   console.log(`[Pipeline] Action item: "${actionItem.item.slice(0, 80)}"`);
 
-  // Step 1: Fetch conversation + checkout date from Hospitable in parallel
+  // ── Check-in/out requests: save as pending, GitHub Action processes after delay
+  const isCheckInOut = isCheckInOutRequest(actionItem.item);
+  if (isCheckInOut) {
+    return await handleCheckInOutRequest(actionItem, isCheckInOut);
+  }
+
+  // ── Pet fee detection — check before skipping reservation changes
+  if (isPetFeeRequest(actionItem.item)) {
+    return await handlePetFeeRequest(actionItem);
+  }
+
+  // ── Skip other reservation changes
+  const SKIP_CATEGORIES = ["RESERVATION CHANGES"];
+  if (SKIP_CATEGORIES.includes(actionItem.category)) {
+    console.log(`[Pipeline] Skipping category: ${actionItem.category}`);
+    return { skipped: true, skip_reason: `Category "${actionItem.category}" is excluded`, decision: undefined };
+  }
+
+  // ── Standard issue pipeline ──────────────────────────────────────────────────
+
   let messages = [];
   let checkoutDate: string | null = null;
 
@@ -40,20 +65,15 @@ async function processActionItem(
     console.error(`[Pipeline] Hospitable fetch failed: ${err instanceof Error ? err.message : err}`);
   }
 
-  // Step 2: Claude classifies and decides
   const decision = await getRoutingDecision(actionItem, messages);
   console.log(`[Pipeline] Decision: ${decision.reasoning} | type: ${decision.task_type}`);
 
-  // Step 3: Resolve property
   const propertyId = resolvePropertyId(actionItem.property_alias, actionItem.property_name);
   const property = propertyId ? PROPERTIES[propertyId] : null;
-
   const result: PipelineResult = { decision };
 
-  // Step 4: No action needed — log and skip
   if (!decision.guest_requesting_visit && !decision.issue_needs_attention) {
     console.log("[Pipeline] No action needed — skipping");
-
     await saveIssue({
       id: randomUUID(),
       timestamp: actionItem.created_at_utc || new Date().toISOString(),
@@ -73,12 +93,9 @@ async function processActionItem(
       conversation_length: messages.length,
       notified_contact: null,
     });
-
     return { skipped: true, skip_reason: decision.reasoning, decision };
   }
 
-  // Step 5: Determine due date
-  // Urgent = today, Next clean = checkout date (fallback to today)
   const today = new Date().toISOString().slice(0, 10);
   const dueDate = decision.task_type === "next_clean" && checkoutDate
     ? checkoutDate
@@ -86,52 +103,69 @@ async function processActionItem(
 
   console.log(`[Pipeline] Task type: ${decision.task_type}, due: ${dueDate}`);
 
-  // Step 6: Create Asana task first so we have URL for SMS
   let taskId: string | null = null;
   let taskUrl: string | null = null;
   let taskCreated = false;
 
-  if (decision.create_task && property?.asanaProjectId) {
-    const assignee = decision.task_assignee_key ? TEAM[decision.task_assignee_key] : null;
-    result.task = await createTask({
-      title: decision.task_title,
-      description: [
-        decision.task_description,
-        "",
-        `Guest: ${actionItem.guest_name}`,
-        `Reservation: ${actionItem.reservation_id}`,
-        `Task Type: ${decision.task_type === "urgent" ? "URGENT — visit required" : "NEXT CLEAN — address at turnover"}`,
-        `Source: HostbuddyAI`,
-      ].join("\n"),
-      priority: decision.task_priority,
-      assigneeGid: assignee?.asanaUserId || null,
-      projectGid: property.asanaProjectId,
-        sectionGid: property.asanaSectionId || null,
-      dueDate,
-    });
-    taskCreated = result.task.success;
-    taskId = result.task.taskId ?? null;
-    taskUrl = result.task.taskUrl ?? null;
+  if (decision.create_task) {
+    // Housekeeper categories → property Asana project (Ryan/Amanda)
+    // Everything else → STR Tasks → Jordan section
+    const isHousekeeperTask = HOUSEKEEPER_SMS_CATEGORIES.includes(actionItem.category);
+
+    const projectGid = isHousekeeperTask
+      ? property?.asanaProjectId || ""
+      : STR_TASKS_PROJECT_GID;
+
+    const sectionGid = isHousekeeperTask
+      ? property?.asanaSectionId || null
+      : STR_TASKS_JORDAN_SECTION_GID;
+
+    const assignee = isHousekeeperTask
+      ? (decision.task_assignee_key ? TEAM[decision.task_assignee_key] : null)
+      : null; // Jordan is assigned via section, not by user GID
+
+    if (projectGid) {
+      result.task = await createTask({
+        title: decision.task_title,
+        description: [
+          decision.task_description,
+          "",
+          `Guest: ${actionItem.guest_name}`,
+          `Reservation: ${actionItem.reservation_id}`,
+          `Property: ${actionItem.property_alias}`,
+          `Task Type: ${decision.task_type === "urgent" ? "URGENT — visit required" : "NEXT CLEAN — address at turnover"}`,
+          `Source: HostbuddyAI`,
+        ].join("\n"),
+        priority: decision.task_priority,
+        assigneeGid: assignee?.asanaUserId || null,
+        projectGid,
+        sectionGid,
+        dueDate,
+      });
+      taskCreated = result.task.success;
+      taskId = result.task.taskId ?? null;
+      taskUrl = result.task.taskUrl ?? null;
+    }
   }
 
-  // Step 7: Send SMS with task URL appended
   let smsSent = false;
   let notifiedContact: string | null = null;
 
-  if (decision.send_sms && decision.sms_to_key) {
+  // Only SMS Ryan/Amanda for maintenance and supply issues
+  const shouldSmsHousekeeper = HOUSEKEEPER_SMS_CATEGORIES.includes(actionItem.category);
+
+  if (shouldSmsHousekeeper && decision.send_sms && decision.sms_to_key) {
     const recipient = TEAM[decision.sms_to_key];
     if (recipient?.phone) {
       const fullMessage = taskUrl
         ? `${decision.sms_message}\n${taskUrl}`
         : decision.sms_message;
-
       result.sms = await sendSMS(recipient.phone, fullMessage);
       smsSent = result.sms.success;
       notifiedContact = recipient.name;
     }
   }
 
-  // Step 8: Urgent call SMS for critical
   if (decision.send_call && decision.call_to_key) {
     const recipient = TEAM[decision.call_to_key];
     if (recipient?.phone) {
@@ -140,7 +174,6 @@ async function processActionItem(
     }
   }
 
-  // Step 9: Save to DB
   await saveIssue({
     id: randomUUID(),
     timestamp: actionItem.created_at_utc || new Date().toISOString(),
@@ -171,7 +204,104 @@ async function processActionItem(
   return result;
 }
 
-function resolvePropertyId(alias: string, name: string): string | null {
+/** Detect if an action item is an early check-in or late checkout request */
+function isCheckInOutRequest(
+  item: string
+): "early_checkin" | "late_checkout" | null {
+  const lower = item.toLowerCase();
+  if (lower.includes("early check") || lower.includes("check in early") ||
+      lower.includes("check-in early") || lower.includes("early arrival") ||
+      lower.includes("arrive early")) {
+    return "early_checkin";
+  }
+  if (lower.includes("late check") || lower.includes("check out late") ||
+      lower.includes("check-out late") || lower.includes("late departure") ||
+      lower.includes("stay later") || lower.includes("leave late") ||
+      lower.includes("late checkout") || lower.includes("later checkout")) {
+    return "late_checkout";
+  }
+  return null;
+}
+
+/** Detect if an action item mentions a pet fee */
+function isPetFeeRequest(item: string): boolean {
+  const lower = item.toLowerCase();
+  return (
+    (lower.includes("pet") || lower.includes("dog") || lower.includes("cat") ||
+     lower.includes("animal")) &&
+    (lower.includes("fee") || lower.includes("charge") || lower.includes("pay") ||
+     lower.includes("cost") || lower.includes("bring") || lower.includes("staying") ||
+     lower.includes("with us") || lower.includes("coming"))
+  );
+}
+
+/** Handle pet fee — alert business with platform-specific payment link */
+async function handlePetFeeRequest(
+  actionItem: HostbuddyActionItem
+): Promise<PipelineResult> {
+  console.log(`[Pipeline] Pet fee request detected`);
+
+  // Fetch reservation to get platform
+  let paymentUrl = `https://app.hospitable.com/conversations/${actionItem.reservation_id}`;
+  let platformLabel = "hosting platform";
+
+  try {
+    const reservation = await getReservationDetails(actionItem.reservation_id);
+    if (reservation) {
+      paymentUrl = getPaymentRequestUrl(
+        actionItem.reservation_id,
+        reservation.platform,
+        reservation.platform_reservation_id
+      );
+      platformLabel = reservation.platform === "unknown" ? "hosting platform" : reservation.platform;
+    }
+  } catch (err) {
+    console.error(`[Pipeline] Failed to fetch reservation for pet fee:`, err);
+  }
+
+  // SMS business number with payment link
+  const propertyId = resolvePropertyId(actionItem.property_alias, actionItem.property_name);
+  await sendSMS(
+    BUSINESS_PHONE,
+    `*AI Msg* Pet fee needed for ${actionItem.guest_name} at ${actionItem.property_alias} ($150). Send payment request on ${platformLabel}: ${paymentUrl}`
+  );
+
+  console.log(`[Pipeline] Pet fee alert sent to business number`);
+  return { skipped: false, skip_reason: undefined, decision: undefined };
+}
+
+/** Save check-in/out request as pending for delayed processing */
+async function handleCheckInOutRequest(
+  actionItem: HostbuddyActionItem,
+  type: "early_checkin" | "late_checkout"
+): Promise<PipelineResult> {
+  console.log(`[Pipeline] Check-in/out request detected: ${type}`);
+
+  const propertyId = resolvePropertyId(actionItem.property_alias, actionItem.property_name);
+  const firstName = actionItem.guest_name.split(" ")[0];
+
+  // Process after 7 minutes
+  const processAfter = new Date(Date.now() + 7 * 60 * 1000).toISOString();
+
+  await savePendingCheckInOut({
+    id: randomUUID(),
+    created_at: new Date().toISOString(),
+    process_after: processAfter,
+    status: "pending",
+    type,
+    reservation_id: actionItem.reservation_id,
+    property_id: propertyId ?? "unknown",
+    property_alias: actionItem.property_alias,
+    guest_name: actionItem.guest_name,
+    guest_first_name: firstName,
+    action_item: actionItem.item,
+  });
+
+  console.log(`[Pipeline] Saved pending ${type} for processing after ${processAfter}`);
+  return { skipped: true, skip_reason: `Check-in/out request queued for delayed processing`, decision: undefined };
+}
+
+export function resolvePropertyId(alias: string, name: string): string | null {
   const combined = `${alias} ${name}`.toLowerCase();
   if (combined.includes("delta") || combined.includes("dawn")) return "delta-dawn";
   if (combined.includes("legob") || combined.includes("lego")) return "legobii";

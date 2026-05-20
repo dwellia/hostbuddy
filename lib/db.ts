@@ -174,3 +174,71 @@ export function buildMetrics(issues: IssueRecord[]) {
 
   return { total, urgent, nextClean, smsSent, tasksCreated, byProperty, byCategory, byMonth };
 }
+
+// ── Pending check-in/out requests ─────────────────────────────────────────────
+
+async function ensurePendingTable(): Promise<void> {
+  const db = sql();
+  await db`
+    CREATE TABLE IF NOT EXISTS pending_checkinout (
+      id TEXT PRIMARY KEY,
+      created_at TIMESTAMPTZ NOT NULL,
+      process_after TIMESTAMPTZ NOT NULL,
+      status TEXT DEFAULT 'pending',
+      type TEXT NOT NULL,
+      reservation_id TEXT NOT NULL,
+      property_id TEXT NOT NULL,
+      property_alias TEXT NOT NULL,
+      guest_name TEXT NOT NULL,
+      guest_first_name TEXT NOT NULL,
+      action_item TEXT NOT NULL
+    )
+  `;
+}
+
+export async function savePendingCheckInOut(record: import("./types").PendingCheckInOut): Promise<void> {
+  await ensurePendingTable();
+  const db = sql();
+  await db`
+    INSERT INTO pending_checkinout (
+      id, created_at, process_after, status, type,
+      reservation_id, property_id, property_alias,
+      guest_name, guest_first_name, action_item
+    ) VALUES (
+      ${record.id}, ${record.created_at}, ${record.process_after}, ${record.status},
+      ${record.type}, ${record.reservation_id}, ${record.property_id},
+      ${record.property_alias}, ${record.guest_name}, ${record.guest_first_name},
+      ${record.action_item}
+    )
+  `;
+  console.log(`[DB] Saved pending check-in/out ${record.id}`);
+}
+
+export async function getPendingCheckInOuts(): Promise<import("./types").PendingCheckInOut[]> {
+  await ensurePendingTable();
+  const db = sql();
+  const rows = await db`
+    SELECT * FROM pending_checkinout
+    WHERE status = 'pending'
+    AND process_after <= NOW()
+    ORDER BY created_at ASC
+  `;
+  return rows.map((r: any) => ({
+    id: r.id,
+    created_at: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at,
+    process_after: r.process_after instanceof Date ? r.process_after.toISOString() : r.process_after,
+    status: r.status,
+    type: r.type,
+    reservation_id: r.reservation_id,
+    property_id: r.property_id,
+    property_alias: r.property_alias,
+    guest_name: r.guest_name,
+    guest_first_name: r.guest_first_name,
+    action_item: r.action_item,
+  }));
+}
+
+export async function markCheckInOutProcessed(id: string, status: "processed" | "failed"): Promise<void> {
+  const db = sql();
+  await db`UPDATE pending_checkinout SET status = ${status} WHERE id = ${id}`;
+}

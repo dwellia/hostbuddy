@@ -31,9 +31,11 @@ export interface HospitableMessage {
   attachments: any[];
 }
 
+// ── Existing issue decision ───────────────────────────────────────────────────
+
 export interface Decision {
   guest_requesting_visit: boolean;
-  issue_needs_attention: boolean; // true = next clean task, false = no action
+  issue_needs_attention: boolean;
   send_sms: boolean;
   sms_to_key: string | null;
   sms_message: string;
@@ -47,6 +49,27 @@ export interface Decision {
   task_type: "urgent" | "next_clean";
   reasoning: string;
 }
+
+// ── Check-in/out request (pending, processed via GitHub Action) ───────────────
+
+export type CheckInOutType = "early_checkin" | "late_checkout";
+export type CheckInOutStatus = "pending" | "processed" | "failed";
+
+export interface PendingCheckInOut {
+  id: string;
+  created_at: string;
+  process_after: string;         // ISO — when GitHub Action should process this
+  status: CheckInOutStatus;
+  type: CheckInOutType;
+  reservation_id: string;
+  property_id: string;
+  property_alias: string;
+  guest_name: string;
+  guest_first_name: string;
+  action_item: string;           // raw HostbuddyAI item text
+}
+
+// ── Results ───────────────────────────────────────────────────────────────────
 
 export interface QuoSendResult {
   success: boolean;

@@ -28,6 +28,9 @@ NEXT CLEAN examples:
 - "The cabinet hinge is loose" → NEXT CLEAN
 
 NO ACTION examples:
+- Reservation change requests (early check-out, late check-out, date changes) → NO ACTION
+- Guest count adjustments → NO ACTION
+- Any RESERVATION CHANGES category → NO ACTION
 - Early check-in request → NO ACTION
 - Question that just needs a text answer → NO ACTION
 - Complaint already resolved → NO ACTION
