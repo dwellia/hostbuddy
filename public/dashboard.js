@@ -288,13 +288,12 @@ function renderRepeatIssues(issues) {
 
   var STOPWORDS = /\b(the|a|an|is|are|was|not|and|or|in|at|to|of|for|it|that|this|with|has|have|been|guest|said|says|asking|asked|please|would|could|can|need|needs|check|working|didnt|isnt|wont|doesnt|there|they|them|their|from|out|up|on|we|us|our|you|your|he|she|reported|flagged|noted|issue|issues|problem|problems|about|also|just|very|some|more|been|were|when|then|but|all|its)\b/gi;
 
-  // Operational categories only
   var OPERATIONAL = ['MAINTENANCE', 'SUPPLY', 'CLEANLINESS'];
   var operational = issues.filter(function(i) { return OPERATIONAL.includes(i.category); });
 
   if (!operational.length) {
     card.innerHTML =
-      '<div class="clabel">Repeat Issues</div>' +
+      '<div style="display:flex;align-items:center;margin-bottom:12px;"><span class="clabel blue" style="margin-bottom:0;">Repeat Issues</span></div>' +
       '<div style="padding:28px 0;text-align:center;color:var(--text-3);font-size:12px;font-weight:500;">No operational issues in this time range</div>';
     return;
   }
@@ -311,7 +310,7 @@ function renderRepeatIssues(issues) {
     return { issue: issue, words: words };
   });
 
-  // Cluster by shared keywords — lower threshold so small datasets still cluster
+  // Cluster by shared keywords
   var clusters = [];
   var used = {};
 
@@ -328,17 +327,67 @@ function renderRepeatIssues(issues) {
         used[j] = true;
       }
     });
-    // Include single issues too — everything is shown, repeats just get higher count
-    var label = group.slice().sort(function(a, b) { return a.action_item.length - b.action_item.length; })[0].action_item;
-    if (label.length > 65) label = label.slice(0, 62) + '…';
-    clusters.push({ label: label, count: group.length, issues: group, category: group[0].category });
+    // Placeholder label — will be replaced by Claude summary
+    clusters.push({ label: '…', count: group.length, issues: group, category: group[0].category });
   });
 
-  // Sort: repeats first (count > 1), then by count desc
-  clusters.sort(function(a, b) {
-    if (b.count !== a.count) return b.count - a.count;
-    return 0;
+  clusters.sort(function(a, b) { return b.count - a.count; });
+
+  // Show loading state while Claude summarizes
+  renderRepeatRows(clusters, card);
+
+  // Ask Claude to summarize each cluster in 3-5 words
+  var descriptions = clusters.slice(0, 10).map(function(c) {
+    return c.issues.map(function(i) { return i.action_item; }).join(' | ');
   });
+
+  fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 300,
+      messages: [{
+        role: 'user',
+        content: 'Summarize each of the following vacation rental issue groups in 3-5 words maximum. Be broad and general. Examples: "Hot tub not heating", "Insufficient towel supply", "Arcade game malfunction", "WiFi connectivity issues". Return ONLY a JSON array of strings, one per group, no explanation.\n\nGroups:\n' +
+          descriptions.map(function(d, i) { return (i + 1) + '. ' + d; }).join('\n')
+      }]
+    })
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    var text = data.content && data.content[0] ? data.content[0].text : '[]';
+    var cleaned = text.replace(/```json\n?|```\n?/g, '').trim();
+    var labels = JSON.parse(cleaned);
+    clusters.forEach(function(c, i) { if (labels[i]) c.label = labels[i]; });
+    renderRepeatRows(clusters, card);
+  })
+  .catch(function() {
+    // Fallback — just show top keywords if Claude fails
+    clusters.forEach(function(c) {
+      if (c.label === '…') {
+        var words = c.issues[0].action_item
+          .replace(/[^a-zA-Z\s]/g, ' ')
+          .replace(STOPWORDS, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .split(' ')
+          .filter(function(w) { return w.length > 3; })
+          .slice(0, 3)
+          .map(function(w) { return w.charAt(0).toUpperCase() + w.slice(1); })
+          .join(' ');
+        c.label = words || 'Unknown issue';
+      }
+    });
+    renderRepeatRows(clusters, card);
+  });
+}
+
+function renderRepeatRows(clusters, card) {
+  var repeatCount = clusters.filter(function(c) { return c.count >= 2; }).length;
+  var subtitle = repeatCount > 0
+    ? '<span style="font-size:10px;color:var(--red);font-weight:600;margin-left:8px;">' + repeatCount + ' repeat' + (repeatCount > 1 ? 's' : '') + '</span>'
+    : '<span style="font-size:10px;color:var(--text-3);font-weight:500;margin-left:8px;">No repeats yet</span>';
 
   var maxCount = clusters.length ? clusters[0].count : 1;
 
@@ -368,14 +417,9 @@ function renderRepeatIssues(issues) {
     '</div>';
   }).join('');
 
-  var repeatCount = clusters.filter(function(c) { return c.count >= 2; }).length;
-  var subtitle = repeatCount > 0
-    ? '<span style="font-size:10px;color:var(--red);font-weight:600;margin-left:8px;">' + repeatCount + ' repeat pattern' + (repeatCount > 1 ? 's' : '') + '</span>'
-    : '<span style="font-size:10px;color:var(--text-3);font-weight:500;margin-left:8px;">No repeats yet</span>';
-
   card.innerHTML =
     '<div style="display:flex;align-items:center;margin-bottom:12px;">' +
-      '<span class="clabel" style="margin-bottom:0;">Repeat Issues</span>' + subtitle +
+      '<span class="clabel blue" style="margin-bottom:0;">Repeat Issues</span>' + subtitle +
     '</div>' + rows;
 }
 

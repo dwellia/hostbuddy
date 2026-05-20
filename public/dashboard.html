@@ -85,6 +85,7 @@
     /* Cards */
     .card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); position: relative; }
     .clabel { font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-3); margin-bottom: 12px; }
+    .clabel.blue { color: var(--blue); }
     .cvalue { font-family: 'DM Mono', monospace; font-size: 28px; font-weight: 600; line-height: 1; letter-spacing: -0.02em; margin-bottom: 3px; }
     .cvalue.blue   { color: var(--blue); }
     .cvalue.green  { color: var(--green); }
@@ -214,15 +215,15 @@
     <div class="sh"><span class="sh-label">Breakdown</span><div class="sh-rule"></div></div>
     <div class="grid">
       <div class="card c4">
-        <div class="clabel">By Category</div>
+        <div class="clabel blue">By Category</div>
         <div class="chart-wrap"><canvas id="chartCategory"></canvas></div>
       </div>
       <div class="card c4">
-        <div class="clabel">By Property</div>
+        <div class="clabel blue">By Property</div>
         <div class="chart-wrap"><canvas id="chartProperty"></canvas></div>
       </div>
       <div class="card c4" id="repeatIssuesCard" style="overflow-y:auto;max-height:270px;">
-        <div class="clabel">Repeat Issues</div>
+        <div class="clabel blue">Repeat Issues</div>
         <div style="padding:24px 0;text-align:center;color:var(--text-3);font-size:12px;">Loading...</div>
       </div>
     </div>
