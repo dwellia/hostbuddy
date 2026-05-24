@@ -145,9 +145,9 @@ export async function getReservationDetails(
       attrs.airbnb_thread_id ?? attrs.platform_reservation_id ??
       attrs.external_id ?? attrs.ota_reservation_id ?? null;
 
-    // Hospitable stores the OTA confirmation code at data.reservation.code
-    // e.g. "HMTWH9F4MZ" for Airbnb, same pattern for VRBO and Booking.com
-    const airbnbCode = data?.data?.reservation?.code ?? attrs.code ?? null;
+    // Hospitable stores the OTA confirmation code at data.code (e.g. "HMBRP4NKSA")
+    // This is the same code Airbnb/VRBO use in their own URLs
+    const airbnbCode = data?.data?.code ?? attrs.code ?? null;
 
     return {
       id: reservationId,
