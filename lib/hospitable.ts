@@ -127,8 +127,9 @@ export async function getReservationDetails(
     const data = await res.json() as { data?: any };
     const attrs = data?.data?.attributes ?? data?.data ?? {};
 
-    // Detect booking platform from source field
+    // Hospitable returns platform at data.platform (e.g. "airbnb", "vrbo", "booking.com")
     const source = (
+      data?.data?.platform ??
       attrs.source ?? attrs.platform ?? attrs.channel ??
       attrs.booking_source ?? attrs.origin ?? ""
     ).toLowerCase();
@@ -144,9 +145,9 @@ export async function getReservationDetails(
       attrs.airbnb_thread_id ?? attrs.platform_reservation_id ??
       attrs.external_id ?? attrs.ota_reservation_id ?? null;
 
-    // Hospitable returns the OTA confirmation code in the `code` field
-    // e.g. "HMXZTQ5E3Z" for Airbnb — this is what Airbnb uses in its URLs
-    const airbnbCode = attrs.code ?? null;
+    // Hospitable stores the OTA confirmation code at data.reservation.code
+    // e.g. "HMTWH9F4MZ" for Airbnb, same pattern for VRBO and Booking.com
+    const airbnbCode = data?.data?.reservation?.code ?? attrs.code ?? null;
 
     return {
       id: reservationId,
@@ -265,18 +266,19 @@ export async function updateReservationTime(
 export function getPaymentRequestUrl(
   reservationId: string,
   platform: BookingPlatform,
-  airbnbCode: string | null,
+  reservationCode: string | null,
   platformReservationId: string | null
 ): string {
+  const code = reservationCode ?? platformReservationId;
   switch (platform) {
     case "airbnb":
-      // Use Hospitable's `code` field (e.g. "HMXZTQ5E3Z") for the direct Airbnb reservation URL
-      const code = airbnbCode ?? platformReservationId;
       return code
-        ? `https://www.airbnb.com/hosting/reservations/details/${code}`
+        ? `https://www.airbnb.com/hosting/stay/${code}`
         : `https://www.airbnb.com/resolutions`;
     case "vrbo":
-      return `https://www.vrbo.com/rm/propertymanager/reservations`;
+      return code
+        ? `https://www.vrbo.com/rm/propertymanager/reservation/${code}`
+        : `https://www.vrbo.com/rm/propertymanager/reservations`;
     case "booking.com":
       return `https://admin.booking.com/hotel/hoteladmin/reservations.html`;
     case "direct":
