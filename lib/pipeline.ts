@@ -251,6 +251,7 @@ async function handlePetFeeRequest(
       paymentUrl = getPaymentRequestUrl(
         actionItem.reservation_id,
         reservation.platform,
+        reservation.airbnb_code,
         reservation.platform_reservation_id
       );
       platformLabel = reservation.platform === "unknown" ? "hosting platform" : reservation.platform;

@@ -111,7 +111,8 @@ export interface ReservationDetails {
   guest_name: string;
   property_id: string;
   platform: BookingPlatform;
-  platform_reservation_id: string | null; // ID on the OTA platform if available
+  airbnb_code: string | null;            // Hospitable `code` field e.g. "HMXZTQ5E3Z"
+  platform_reservation_id: string | null;
 }
 
 export async function getReservationDetails(
@@ -143,6 +144,10 @@ export async function getReservationDetails(
       attrs.airbnb_thread_id ?? attrs.platform_reservation_id ??
       attrs.external_id ?? attrs.ota_reservation_id ?? null;
 
+    // Hospitable returns the OTA confirmation code in the `code` field
+    // e.g. "HMXZTQ5E3Z" for Airbnb — this is what Airbnb uses in its URLs
+    const airbnbCode = attrs.code ?? null;
+
     return {
       id: reservationId,
       checkin: (attrs.start_date ?? attrs.check_in ?? "").slice(0, 10),
@@ -152,6 +157,7 @@ export async function getReservationDetails(
       guest_name: attrs.guest?.name ?? attrs.guest_name ?? "",
       property_id: attrs.property_id ?? data?.data?.relationships?.property?.data?.id ?? "",
       platform,
+      airbnb_code: airbnbCode,
       platform_reservation_id: platformReservationId,
     };
   } catch (err) {
@@ -259,16 +265,19 @@ export async function updateReservationTime(
 export function getPaymentRequestUrl(
   reservationId: string,
   platform: BookingPlatform,
+  airbnbCode: string | null,
   platformReservationId: string | null
 ): string {
-  const id = platformReservationId || reservationId;
   switch (platform) {
     case "airbnb":
-      return `https://www.airbnb.com/hosting/reservations/${id}`;
+      // Use Hospitable's `code` field (e.g. "HMXZTQ5E3Z") for the direct Airbnb reservation URL
+      const code = airbnbCode ?? platformReservationId;
+      return code
+        ? `https://www.airbnb.com/hosting/reservations/details/${code}`
+        : `https://www.airbnb.com/resolutions`;
     case "vrbo":
-      return `https://www.vrbo.com/rm/propertymanager/reservation/${id}`;
+      return `https://www.vrbo.com/rm/propertymanager/reservations`;
     case "booking.com":
-      // Booking.com has no deep link to a specific reservation's payment page
       return `https://admin.booking.com/hotel/hoteladmin/reservations.html`;
     case "direct":
       return `https://app.hospitable.com/conversations/${reservationId}`;
