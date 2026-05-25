@@ -85,7 +85,7 @@ async function handleEarlyCheckin(
     if (housekeeper?.phone) {
       await sendSMS(
         housekeeper.phone,
-        `*AI Msg* Hi! The guest at ${pending.property_alias} is requesting early check-in. We told them we have a same-day checkout and made no promises, but please let us know when cleaning finishes and we'll send them right in. Thank you!`
+        `*AI Msg* Hi! The guest at ${pending.property_alias} is requesting early check-in. We told them we have a same-day checkout and made no promises, but please let us know when you finish and we'll send them right in. Thank you!`
       );
     }
 
@@ -139,7 +139,7 @@ async function handleEarlyCheckin(
     }
 
     // Alert business to send payment request
-    const airbnbUrl = `https://www.airbnb.com/hosting/reservations/${pending.reservation_id}`;
+    const airbnbUrl = `https://www.airbnb.com/hosting/stay/${pending.reservation_id}`;
     await sendSMS(
       BUSINESS_PHONE,
       `*AI Msg* Early check-in approved for ${pending.guest_name} at ${pending.property_alias} — ${formatTime(requestedTime)} (${hoursEarly}hr${hoursEarly > 1 ? "s" : ""}, $${fee}). Send payment request: ${airbnbUrl}`
@@ -198,7 +198,7 @@ async function handleLateCheckout(
   }
 
   // Alert business to send payment request
-  const airbnbUrl = `https://www.airbnb.com/hosting/reservations/${pending.reservation_id}`;
+  const airbnbUrl = `https://www.airbnb.com/hosting/stay/${pending.reservation_id}`;
   await sendSMS(
     BUSINESS_PHONE,
     `*AI Msg* Late checkout approved for ${pending.guest_name} at ${pending.property_alias} — ${formatTime(requestedTime)} (${hoursLate}hr${hoursLate > 1 ? "s" : ""}, $${fee}). Send payment request: ${airbnbUrl}`
