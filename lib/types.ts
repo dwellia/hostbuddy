@@ -36,6 +36,7 @@ export interface HospitableMessage {
 export interface Decision {
   guest_requesting_visit: boolean;
   issue_needs_attention: boolean;
+  corrected_category: string;
   send_sms: boolean;
   sms_to_key: string | null;
   sms_message: string;

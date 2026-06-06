@@ -38,7 +38,6 @@ function loadData() {
 
 function deleteIssue(id, event) {
   event.stopPropagation();
-  if (!confirm('Delete this issue?')) return;
   fetch('/api/delete-issue?id=' + id, { method: 'DELETE' })
     .then(function(res) { return res.json(); })
     .then(function(data) {

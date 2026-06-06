@@ -27,6 +27,13 @@ NEXT CLEAN examples:
 - "One of the arcade games isn't working" (no visit request) → NEXT CLEAN
 - "The cabinet hinge is loose" → NEXT CLEAN
 
+CATEGORY CLASSIFICATION — use the category from the HostbuddyAI action item, but correct it if wrong:
+- CLEANLINESS: mold, mildew, dirty surfaces, stains, odors, dust, grime — anything requiring cleaning
+- MAINTENANCE: broken equipment, mechanical failures, electrical issues, structural damage — anything requiring repair
+- SUPPLY: missing or insufficient items (towels, toiletries, paper products, kitchen supplies)
+- GUEST REQUESTS: guest asking for something, information requests, suggestions
+- OTHER: anything that doesn't fit above
+
 NO ACTION examples:
 - Reservation change requests (early check-out, late check-out, date changes) → NO ACTION
 - Guest count adjustments → NO ACTION
@@ -34,6 +41,8 @@ NO ACTION examples:
 - Early check-in request → NO ACTION
 - Question that just needs a text answer → NO ACTION
 - Complaint already resolved → NO ACTION
+
+IMPORTANT: Post-stay feedback about cleanliness, maintenance, or supply issues should ALWAYS be NEXT CLEAN — even if the guest has already checked out. These are actionable items for the next turnover. Never classify a reported physical issue as NO ACTION just because it came after checkout.
 
 If the action item contains "**TEST**" treat it as URGENT for testing purposes.
 
@@ -68,6 +77,7 @@ Respond ONLY with valid JSON, no markdown:
 {
   "guest_requesting_visit": boolean,
   "issue_needs_attention": boolean,
+  "corrected_category": "CLEANLINESS|MAINTENANCE|SUPPLY|GUEST REQUESTS|OTHER — correct the category if HostbuddyAI got it wrong",
   "send_sms": boolean,
   "sms_to_key": "ryan or amanda or null",
   "sms_message": "message text under 100 chars",

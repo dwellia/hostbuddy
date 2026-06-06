@@ -12,7 +12,7 @@ import type { HostbuddyActionItem, HostbuddyPayload, PipelineResult } from "./ty
 import { randomUUID } from "crypto";
 
 // Categories that should SMS Ryan/Amanda
-const HOUSEKEEPER_SMS_CATEGORIES = ["MAINTENANCE", "SUPPLY"];
+const HOUSEKEEPER_SMS_CATEGORIES = ["MAINTENANCE", "SUPPLY", "CLEANLINESS"];
 
 // Business number for payment request reminders
 const BUSINESS_PHONE = "+18652811917";
@@ -108,9 +108,12 @@ async function processActionItem(
   let taskCreated = false;
 
   if (decision.create_task) {
+    // Use Claude's corrected category for routing — it may fix HostbuddyAI misclassifications
+    const effectiveCategory = decision.corrected_category || actionItem.category;
+
     // Housekeeper categories → property Asana project (Ryan/Amanda)
     // Everything else → STR Tasks → Jordan section
-    const isHousekeeperTask = HOUSEKEEPER_SMS_CATEGORIES.includes(actionItem.category);
+    const isHousekeeperTask = HOUSEKEEPER_SMS_CATEGORIES.includes(effectiveCategory);
 
     const projectGid = isHousekeeperTask
       ? property?.asanaProjectId || ""
@@ -151,8 +154,9 @@ async function processActionItem(
   let smsSent = false;
   let notifiedContact: string | null = null;
 
-  // Only SMS Ryan/Amanda for maintenance and supply issues
-  const shouldSmsHousekeeper = HOUSEKEEPER_SMS_CATEGORIES.includes(actionItem.category);
+  // Use Claude's corrected category for SMS routing
+  const effectiveCategoryForSms = decision.corrected_category || actionItem.category;
+  const shouldSmsHousekeeper = HOUSEKEEPER_SMS_CATEGORIES.includes(effectiveCategoryForSms);
 
   if (shouldSmsHousekeeper && decision.send_sms && decision.sms_to_key) {
     const recipient = TEAM[decision.sms_to_key];
