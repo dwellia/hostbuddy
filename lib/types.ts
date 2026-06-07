@@ -54,7 +54,7 @@ export interface Decision {
 // ── Check-in/out request (pending, processed via GitHub Action) ───────────────
 
 export type CheckInOutType = "early_checkin" | "late_checkout";
-export type CheckInOutStatus = "pending" | "processed" | "failed";
+export type CheckInOutStatus = "pending" | "processed" | "failed" | "awaiting_cleaner";
 
 export interface PendingCheckInOut {
   id: string;

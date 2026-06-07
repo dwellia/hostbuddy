@@ -213,17 +213,59 @@ function isCheckInOutRequest(
   item: string
 ): "early_checkin" | "late_checkout" | null {
   const lower = item.toLowerCase();
-  if (lower.includes("early check") || lower.includes("check in early") ||
-      lower.includes("check-in early") || lower.includes("early arrival") ||
-      lower.includes("arrive early")) {
+
+  if (
+    lower.includes("early check") ||
+    lower.includes("check in early") ||
+    lower.includes("check-in early") ||
+    lower.includes("early arrival") ||
+    lower.includes("arrive early") ||
+    lower.includes("drop our bag") ||
+    lower.includes("drop bags") ||
+    lower.includes("drop luggage") ||
+    lower.includes("drop our stuff") ||
+    lower.includes("drop our things") ||
+    lower.includes("already here") ||
+    lower.includes("already in town") ||
+    lower.includes("already arrived") ||
+    lower.includes("just arrived") ||
+    lower.includes("just got here") ||
+    lower.includes("head over early") ||
+    lower.includes("get in early") ||
+    lower.includes("come early") ||
+    lower.includes("check inn") ||
+    lower.includes("see if we could check") ||
+    lower.includes("in before") ||
+    lower.includes("in earlier") ||
+    lower.includes("available early") ||
+    lower.includes("ready early")
+  ) {
     return "early_checkin";
   }
-  if (lower.includes("late check") || lower.includes("check out late") ||
-      lower.includes("check-out late") || lower.includes("late departure") ||
-      lower.includes("stay later") || lower.includes("leave late") ||
-      lower.includes("late checkout") || lower.includes("later checkout")) {
+
+  if (
+    lower.includes("late check") ||
+    lower.includes("check out late") ||
+    lower.includes("check-out late") ||
+    lower.includes("late departure") ||
+    lower.includes("stay later") ||
+    lower.includes("leave late") ||
+    lower.includes("late checkout") ||
+    lower.includes("later checkout") ||
+    lower.includes("stay a bit longer") ||
+    lower.includes("stay longer") ||
+    lower.includes("few extra hours") ||
+    lower.includes("extra hour") ||
+    lower.includes("out later") ||
+    lower.includes("leave later") ||
+    lower.includes("check out a little") ||
+    lower.includes("push checkout") ||
+    lower.includes("extend checkout") ||
+    lower.includes("extend our stay")
+  ) {
     return "late_checkout";
   }
+
   return null;
 }
 

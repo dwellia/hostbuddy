@@ -238,7 +238,40 @@ export async function getPendingCheckInOuts(): Promise<import("./types").Pending
   }));
 }
 
-export async function markCheckInOutProcessed(id: string, status: "processed" | "failed"): Promise<void> {
+export async function markCheckInOutProcessed(id: string, status: "processed" | "failed" | "awaiting_cleaner"): Promise<void> {
   const db = sql();
   await db`UPDATE pending_checkinout SET status = ${status} WHERE id = ${id}`;
+}
+
+/** Find an open same-day early check-in for a given property, processed (waiting for cleaner reply) */
+export async function getOpenSameDayCheckin(propertyId: string): Promise<import("./types").PendingCheckInOut | null> {
+  try {
+    await ensurePendingTable();
+    const db = sql();
+    const rows = await db`
+      SELECT * FROM pending_checkinout
+      WHERE status = 'awaiting_cleaner'
+      AND property_id = ${propertyId}
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    if (!rows.length) return null;
+    const r = rows[0];
+    return {
+      id: r.id,
+      created_at: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at,
+      process_after: r.process_after instanceof Date ? r.process_after.toISOString() : r.process_after,
+      status: r.status,
+      type: r.type,
+      reservation_id: r.reservation_id,
+      property_id: r.property_id,
+      property_alias: r.property_alias,
+      guest_name: r.guest_name,
+      guest_first_name: r.guest_first_name,
+      action_item: r.action_item,
+    };
+  } catch (err) {
+    console.error("[DB] getOpenSameDayCheckin error:", err);
+    return null;
+  }
 }
