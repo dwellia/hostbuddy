@@ -8,15 +8,17 @@
  */
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { TEAM, PROPERTIES } from "../lib/team";
+import { TEAM } from "../lib/team";
 import { getOpenSameDayCheckin } from "../lib/db";
 import { handleCleanerReply } from "../lib/checkinout";
 
-// Keywords that indicate the house is ready
-const READY_KEYWORDS = [
+// Keywords that suggest a reply is about property readiness (estimate OR ready)
+const REPLY_KEYWORDS = [
   "done", "ready", "finished", "complete", "all set", "good to go",
   "they can come", "send them", "clean", "wrapped up", "just finished",
-  "all done", "we're done", "we are done"
+  "all done", "we're done", "we are done", "about", "around", "hour",
+  "minutes", "min", "pm", "am", "o'clock", "another", "more", "later",
+  "soon", "almost", "nearly", "right now", "now"
 ];
 
 export default async function handler(
@@ -68,12 +70,12 @@ export default async function handler(
       return;
     }
 
-    // Check if message contains a ready keyword
-    const isReadyMessage = READY_KEYWORDS.some((kw) => messageText.includes(kw));
+    // Check if message could be about property readiness
+    const isReplyMessage = REPLY_KEYWORDS.some((kw) => messageText.includes(kw));
 
-    if (!isReadyMessage) {
-      console.log("[QuoWebhook] Message doesn't indicate readiness — ignoring");
-      res.status(200).json({ status: "ignored", reason: "not a ready message" });
+    if (!isReplyMessage) {
+      console.log("[QuoWebhook] Message doesn't appear to be about readiness — ignoring");
+      res.status(200).json({ status: "ignored", reason: "not a readiness message" });
       return;
     }
 

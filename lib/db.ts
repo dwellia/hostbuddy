@@ -191,9 +191,14 @@ async function ensurePendingTable(): Promise<void> {
       property_alias TEXT NOT NULL,
       guest_name TEXT NOT NULL,
       guest_first_name TEXT NOT NULL,
-      action_item TEXT NOT NULL
+      action_item TEXT NOT NULL,
+      requested_time TEXT,
+      fee INTEGER DEFAULT 0
     )
   `;
+  // Add columns if they don't exist (for existing tables)
+  try { await db`ALTER TABLE pending_checkinout ADD COLUMN IF NOT EXISTS requested_time TEXT`; } catch {}
+  try { await db`ALTER TABLE pending_checkinout ADD COLUMN IF NOT EXISTS fee INTEGER DEFAULT 0`; } catch {}
 }
 
 export async function savePendingCheckInOut(record: import("./types").PendingCheckInOut): Promise<void> {
@@ -243,8 +248,13 @@ export async function markCheckInOutProcessed(id: string, status: "processed" | 
   await db`UPDATE pending_checkinout SET status = ${status} WHERE id = ${id}`;
 }
 
-/** Find an open same-day early check-in for a given property, processed (waiting for cleaner reply) */
-export async function getOpenSameDayCheckin(propertyId: string): Promise<import("./types").PendingCheckInOut | null> {
+export async function updatePendingFee(id: string, requestedTime: string, fee: number): Promise<void> {
+  const db = sql();
+  await db`UPDATE pending_checkinout SET requested_time = ${requestedTime}, fee = ${fee} WHERE id = ${id}`;
+}
+
+/** Find an open early check-in waiting for cleaner reply for a given property */
+export async function getOpenSameDayCheckin(propertyId: string): Promise<(import("./types").PendingCheckInOut & { requested_time: string | null; fee: number }) | null> {
   try {
     await ensurePendingTable();
     const db = sql();
@@ -252,6 +262,7 @@ export async function getOpenSameDayCheckin(propertyId: string): Promise<import(
       SELECT * FROM pending_checkinout
       WHERE status = 'awaiting_cleaner'
       AND property_id = ${propertyId}
+      AND type = 'early_checkin'
       ORDER BY created_at DESC
       LIMIT 1
     `;
@@ -269,6 +280,8 @@ export async function getOpenSameDayCheckin(propertyId: string): Promise<import(
       guest_name: r.guest_name,
       guest_first_name: r.guest_first_name,
       action_item: r.action_item,
+      requested_time: r.requested_time ?? null,
+      fee: r.fee ?? 0,
     };
   } catch (err) {
     console.error("[DB] getOpenSameDayCheckin error:", err);

@@ -16,7 +16,7 @@ import {
 import { sendSMS } from "./quo";
 import { TEAM, PROPERTIES } from "./team";
 import { resolvePropertyId } from "./pipeline";
-import { markCheckInOutProcessed } from "./db";
+import { markCheckInOutProcessed, updatePendingFee } from "./db";
 import type { PendingCheckInOut } from "./types";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -86,44 +86,30 @@ async function handleEarlyCheckin(
     return;
   }
 
-  // No conflict — extract requested time and process
+  // No conflict — text cleaner immediately, store requested time and fee, await reply
   const claudeDecision = await getCheckInOutDecision(pending, "early_checkin");
   const { requestedTime, hoursEarly, fee } = claudeDecision;
 
-  if (!requestedTime) {
-    await sendGuestMessage(
-      pending.reservation_id,
-      `Hi ${pending.guest_first_name}! We'd love to get you in early — check-ins up to 1 hour before 4pm are complimentary, and after that it's $25 per hour. What time were you hoping to check in?`
-    );
-    console.log(`[CheckInOut] Asked guest for requested time`);
-    return;
-  }
+  // Build cleaner SMS — include requested time if guest mentioned one
+  const timeNote = requestedTime
+    ? ` They mentioned hoping to arrive around ${formatTime(requestedTime)}.`
+    : "";
 
-  await updateReservationTime(pending.reservation_id, "checkin", requestedTime);
-
-  if (fee === 0) {
-    await sendGuestMessage(
-      pending.reservation_id,
-      `Hi ${pending.guest_first_name}! Great news — we've got you set for a ${formatTime(requestedTime)} check-in, complimentary. See you then!`
-    );
-    if (housekeeper?.phone) {
-      await sendSMS(housekeeper.phone, `*AI Msg* Heads up — ${pending.property_alias} check-in moved to ${formatTime(requestedTime)} (${pending.guest_name}).`);
-    }
-  } else {
-    await sendGuestMessage(
-      pending.reservation_id,
-      `Hi ${pending.guest_first_name}! We've got you set for a ${formatTime(requestedTime)} check-in. The early check-in fee is $${fee} ($25/hr). We'll send a payment request shortly!`
-    );
-    if (housekeeper?.phone) {
-      await sendSMS(housekeeper.phone, `*AI Msg* Heads up — ${pending.property_alias} check-in moved to ${formatTime(requestedTime)} (${pending.guest_name}).`);
-    }
+  if (housekeeper?.phone) {
     await sendSMS(
-      BUSINESS_PHONE,
-      `*AI Msg* Early check-in approved for ${pending.guest_name} at ${pending.property_alias} — ${formatTime(requestedTime)} (${hoursEarly}hr${hoursEarly > 1 ? "s" : ""}, $${fee}). Send payment request: https://www.airbnb.com/hosting/stay/${pending.reservation_id}`
+      housekeeper.phone,
+      `*AI Msg* Hi! ${pending.guest_name} at ${pending.property_alias} is requesting early check-in.${timeNote} Is the property ready now, or what time do you estimate it'll be ready? Please reply with a time or "ready now".`
     );
   }
 
-  console.log(`[CheckInOut] Early check-in processed — ${requestedTime}, fee: $${fee}`);
+  // Store the requested time and calculated fee so reply handler can use them
+  if (requestedTime) {
+    await updatePendingFee(pending.id, requestedTime, fee);
+  }
+
+  // Mark as awaiting_cleaner
+  await markCheckInOutProcessed(pending.id, "awaiting_cleaner" as any);
+  console.log(`[CheckInOut] Non-back-to-back early check-in — texted cleaner, awaiting reply`);
 }
 
 // ── Late checkout ─────────────────────────────────────────────────────────────
@@ -185,40 +171,41 @@ async function handleLateCheckout(
 export async function handleCleanerReply(
   replyText: string,
   fromPhone: string,
-  pending: PendingCheckInOut
+  pending: PendingCheckInOut & { requested_time: string | null; fee: number }
 ): Promise<void> {
   console.log(`[CheckInOut] Cleaner reply received: "${replyText}"`);
 
-  const property = resolvePropertyId(pending.property_alias, pending.property_id);
-  const housekeeper = property ? TEAM[PROPERTIES[property]?.contactKey] : null;
-
-  // Use Claude to extract the ready time from the reply
-  const prompt = `A vacation rental housekeeper just sent this reply indicating the property is clean and ready:
+  // Ask Claude to classify the reply and extract time if present
+  const prompt = `A vacation rental housekeeper sent this reply about property readiness:
 "${replyText}"
 
 Current time (Eastern): ${getCurrentTimeET()}
 Standard check-in time: 4:00pm
 
-Did they mention a specific time the property will be ready, or a specific time the guest can arrive?
-If yes, extract it.
-If no specific time mentioned, use the current time rounded down to the nearest hour.
+Classify this reply:
+1. READY — property is ready now (e.g. "done", "ready", "finished", "all set", "good to go", "they can come")
+2. ESTIMATE — giving an estimated ready time (e.g. "about 2pm", "another hour", "30 more minutes", "around 1:30")
 
-Rules:
-- Return time in HH:MM 24hr format
-- Early check-in is free if less than 1 hour before 4pm (i.e. after 3pm)
-- $25/hr for each full hour before 3pm (rounded down)
+If ESTIMATE, extract the estimated time in HH:MM 24hr format.
+If READY, use the current time rounded down to nearest hour.
+
+Then calculate:
+- Early check-in is FREE if less than 1 full hour before 4pm (i.e. after 3pm)  
+- $25 per full hour before 3pm (rounded down)
 - Examples: ready at 2pm = 2 hours early = $50. Ready at 3:30pm = free. Ready at 1pm = 3 hours early = $75.
 
 Respond ONLY with valid JSON:
 {
+  "classification": "READY or ESTIMATE",
   "readyTime": "HH:MM",
   "hoursEarly": number,
   "fee": number
 }`;
 
+  let classification = "READY";
   let readyTime = getCurrentTimeRoundedDown();
   let hoursEarly = 0;
-  let fee = 0;
+  let fee = pending.fee ?? 0;
 
   try {
     const response = await client.messages.create({
@@ -229,36 +216,47 @@ Respond ONLY with valid JSON:
     const raw = response.content[0].type === "text" ? response.content[0].text : "";
     const cleaned = raw.replace(/```json\n?|```\n?/g, "").trim();
     const parsed = JSON.parse(cleaned);
+    classification = parsed.classification ?? "READY";
     readyTime = parsed.readyTime ?? readyTime;
     hoursEarly = parsed.hoursEarly ?? 0;
-    fee = parsed.fee ?? 0;
+    fee = parsed.fee ?? fee;
   } catch (err) {
     console.error("[CheckInOut] Claude reply parse error:", err);
   }
 
-  console.log(`[CheckInOut] Ready time: ${readyTime}, fee: $${fee}`);
+  console.log(`[CheckInOut] Reply classified as ${classification}, time: ${readyTime}, fee: $${fee}`);
 
-  // Update reservation time in Hospitable → lock updates automatically
+  if (classification === "ESTIMATE") {
+    // Tell guest estimated time — don't update lock yet
+    await sendGuestMessage(
+      pending.reservation_id,
+      `Hi ${pending.guest_first_name}! Our housekeeping team estimates the property will be ready around ${formatTime(readyTime)}. We'll send you a confirmation as soon as it's done!`
+    );
+    // Store the updated estimate — stay awaiting_cleaner for the next reply
+    await updatePendingFee(pending.id, readyTime, fee);
+    console.log(`[CheckInOut] Estimate sent to guest — still awaiting final ready confirmation`);
+    return;
+  }
+
+  // READY — update reservation, message guest, SMS business if fee applies
   await updateReservationTime(pending.reservation_id, "checkin", readyTime);
 
-  // Message guest — they're good to go
   await sendGuestMessage(
     pending.reservation_id,
     `Hi ${pending.guest_first_name}! Great news, the housekeeping team is finished — you're welcome to head over whenever you're ready!`
   );
 
-  // SMS business if fee applies
   if (fee > 0) {
+    const reservationDetails = await import("./hospitable").then(h => h.getReservationDetails(pending.reservation_id));
+    const airbnbCode = reservationDetails?.airbnb_code ?? pending.reservation_id;
     await sendSMS(
       BUSINESS_PHONE,
-      `*AI Msg* Early check-in fee due for ${pending.guest_name} at ${pending.property_alias} — checked in at ${formatTime(readyTime)} (${hoursEarly}hr${hoursEarly > 1 ? "s" : ""}, $${fee}). Send payment request: https://www.airbnb.com/hosting/stay/${pending.reservation_id}`
+      `*AI Msg* Early check-in fee due for ${pending.guest_name} at ${pending.property_alias} — checked in at ${formatTime(readyTime)} (${hoursEarly}hr${hoursEarly > 1 ? "s" : ""}, $${fee}). Send payment request: https://www.airbnb.com/hosting/stay/${airbnbCode}`
     );
   }
 
-  // Mark as processed
   await markCheckInOutProcessed(pending.id, "processed");
-
-  console.log(`[CheckInOut] Cleaner reply handled — guest notified, reservation updated`);
+  console.log(`[CheckInOut] Cleaner confirmed ready — guest notified, reservation updated, fee: $${fee}`);
 }
 
 // ── Claude time extraction ────────────────────────────────────────────────────
